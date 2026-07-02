@@ -121,7 +121,7 @@ MERGED_BAMS = expand("bam_human/{group}.merged.bam", group = GROUPS)
 ####################################################################
 
 rule all:
-   input: ENVIRONMENT + CHRSTATS + MULTIQC + TRIM_COUNTS + CHRSTATS + QUALIMAPS + MACS3_NARROW_PEAKS + BEDGRAPHS
+    input: ENVIRONMENT + CHRSTATS + MULTIQC + TRIM_COUNTS + CHRSTATS + QUALIMAPS + MACS3_NARROW_PEAKS + BEDGRAPHS
 
 ####################################################################
 # Save environment
@@ -141,8 +141,8 @@ rule environment:
 
 rule trim_adapters:
     input:
-        R1 = 'fastq/{sample}_R1.fastq.gz',
-        R2 = 'fastq/{sample}_R2.fastq.gz'
+        R1 = 'fastq/{sample}_R1_001.fastq.gz',
+        R2 = 'fastq/{sample}_R2_001.fastq.gz'
     output:
         R1 = 'fastq_trimmed/{sample}_R1.fastq.gz',
         R2 = 'fastq_trimmed/{sample}_R2.fastq.gz',
