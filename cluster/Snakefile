@@ -1,0 +1,543 @@
+# Snakemake file for processing ATAC-seq data with bowtie2 and macs3
+# Using Ensembl genome and annotations
+#
+### To install from scratch
+#
+# mamba create --name h3meatac
+# mamba activate h3meatac
+# mamba install snakemake=7.32.4 fastqc multiqc samtools bedtools bc bowtie2 fastp fastq-screen drmaa ribodetector picard macs3 qualimap ucsc-bedgraphtobigwig
+#
+### To recreate the environment
+#
+# mamba create --name myenv --file spec-file.txt
+
+import os
+configfile: 'config/config.yaml'
+
+# Genome file configuration
+
+HUMAN_GENOME_URL = "https://ftp.ensembl.org/pub/release-115/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
+DM_GENOME_URL = "https://ftp.ensembl.org/pub/release-115/fasta/drosophila_melanogaster/dna/Drosophila_melanogaster.BDGP6.54.dna.toplevel.fa.gz"
+
+HUMAN_GENOME_FILE = "genome/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
+DM_GENOME_FILE = "genome/Drosophila_melanogaster.BDGP6.54.dna.toplevel.fa"
+
+CANONICAL_CHROMS = [str(i) for i in range(1, 23)] + ["X", "Y", "MT"]
+NUCLEAR_CHROMS = [str(i) for i in range(1, 23)] + ["X", "Y"]
+
+HUMAN_CANONICAL_FILE = "genome/Homo_sapiens.canonical.fa"
+
+HUMAN_GENOME_INDEX = HUMAN_CANONICAL_FILE + '.fai'
+HUMAN_CHROM_SIZES = "genome/chrom_sizes.txt"
+
+# Fastq Screen config file
+FSCREEN_CONFIG = config['fastq_screen_config']
+
+# Bowtie2 stuff, separated into human and drosophila (dm)
+
+BOWTIE_SUFFIXES = ["1", "2", "3", "4", "rev.1", "rev.2"]
+BOWTIE_INDEX_DIR = "bowtie_index"
+
+# Define genomes with their specific parameters
+GENOMES = {
+    "human_one": {
+        "fasta": HUMAN_CANONICAL_FILE,
+        "params": "--end-to-end --very-sensitive --no-mixed --no-discordant --dovetail --phred33 -I 0 -X 2000",
+    },
+    "human": {
+        "fasta": HUMAN_CANONICAL_FILE,
+        "params": "--end-to-end --very-sensitive --no-mixed --no-discordant --dovetail --phred33 -I 0 -X 2000",
+    },
+    "dm": {
+        "fasta": DM_GENOME_FILE,
+        "params": "--end-to-end --very-sensitive --no-mixed --no-discordant --dovetail --phred33 -I 0 -X 2000",
+    },
+}
+
+# Derived index prefixes
+BOWTIE_INDEX_PREFIX = {
+    genome: f"{BOWTIE_INDEX_DIR}/{genome}"
+    for genome in GENOMES
+}
+
+# Derived full index file lists (used in mapping rule input)
+BOWTIE_INDEX_FILES = {
+    genome: expand(
+        BOWTIE_INDEX_PREFIX[genome] + ".{SUF}.bt2",
+        SUF = BOWTIE_SUFFIXES
+    )
+    for genome in GENOMES
+}
+
+# For spike-in normalisation
+SPIKEIN_TARGET_DEPTH = 100000  # constant to create a scale factor f = 100,000 / spike_in_depth
+
+
+# Read samples from a file
+# I know, this should be done below in groupings, 
+# the only reason I keep this from the previous version
+# is to avoid dre-running all the rules when I added groupings later.
+with open(config["samples"]) as f:
+    SAMPLES = f.read().splitlines()
+
+
+# Read groupings from a CSV file. For BAM merging.
+import csv
+
+GROUPS = set()
+GROUP_TO_SAMPLES = {}
+
+with open(config["sample_groups"]) as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        s = row["sample"]
+        g = row["group"]
+        GROUPS.add(g)
+        GROUP_TO_SAMPLES.setdefault(g, []).append(s)
+
+GROUPS = sorted(GROUPS)
+
+PAIRS = ["R1", "R2"]
+
+
+# Lists for rule all
+
+ENVIRONMENT = ["environment.txt", "spec-file.txt"]
+TRIM_COUNTS = expand("fastq_trimmed/{sample}_count.txt", sample = SAMPLES)
+CHRSTATS = expand("chrcount/{sample}.txt", sample = SAMPLES)
+QCS = expand("qc/{sample}_{pair}_fastqc.html", sample = SAMPLES, pair = PAIRS)
+FSCREENS = expand("fscreen/{sample}_{pair}_screen.txt", sample = SAMPLES, pair = PAIRS)
+MULTIQC = ["multiqc/report.html"]
+CHRSTATS = expand("chrcount/{sample}.txt", sample = SAMPLES)
+BAMS = expand("bam_{genome}/{sample}.bam", sample = SAMPLES, genome = GENOMES.keys())
+BAMS_DEDUP = expand("bam_human/{sample}_dedup.bam", sample = SAMPLES)
+QUALIMAPS = expand("qm_{genome}/{sample}/genome_results.txt", sample = SAMPLES, genome = GENOMES.keys())
+BEDGRAPHS = expand("bedgraph/{sample}.bedgraph", sample = SAMPLES)
+BIGWIGS = expand("bigwig/{sample}.bw", sample = SAMPLES)
+MACS3_NARROW_PEAKS = expand("macs3/narrow/{sample}_peaks.narrowPeak", sample = SAMPLES)
+MERGED_BAMS = expand("bam_human/{group}.merged.bam", group = GROUPS)
+
+
+####################################################################
+
+rule all:
+   input: ENVIRONMENT + CHRSTATS + MULTIQC + TRIM_COUNTS + CHRSTATS + QUALIMAPS + MACS3_NARROW_PEAKS + BEDGRAPHS
+
+####################################################################
+# Save environment
+
+rule environment:
+    output:
+        table = 'environment.txt',
+        spec = 'spec-file.txt'
+    shell:
+       '''
+       mamba list > {output.table}
+       mamba list --explicit > {output.spec}
+       '''
+
+####################################################################
+# Trim adapter sequences.
+
+rule trim_adapters:
+    input:
+        R1 = 'fastq/{sample}_R1.fastq.gz',
+        R2 = 'fastq/{sample}_R2.fastq.gz'
+    output:
+        R1 = 'fastq_trimmed/{sample}_R1.fastq.gz',
+        R2 = 'fastq_trimmed/{sample}_R2.fastq.gz',
+        report = 'fastq_trimmed/{sample}_report.html'
+    threads: 4
+    shell:
+        '''
+        mkdir -p fastq_trimmed
+        mkdir $TMPDIR/fastp
+        fastp -w {threads} -h $TMPDIR/fastp/fastp.html -g --adapter_sequence CTGTCTCTTATA --adapter_sequence_r2 CTGTCTCTTATA -i {input.R1} -I {input.R2} -o $TMPDIR/fastp/R1.gz -O $TMPDIR/fastp/R2.gz
+        mv $TMPDIR/fastp/R1.gz {output.R1}
+        mv $TMPDIR/fastp/R2.gz {output.R2}
+        mv $TMPDIR/fastp/fastp.html {output.report}
+        '''
+
+####################################################################
+# Quality control
+
+rule fastqc:
+    input: 'fastq_trimmed/{prefix}.fastq.gz'
+    output:
+        html = 'qc/{prefix}_fastqc.html',
+        zip = 'qc/{prefix}_fastqc.zip'
+    threads: 2
+    shell:
+        'fastqc -o qc --threads {threads} -f fastq {input}'
+
+####################################################################
+# Fastq Screen
+#   genomes must be installed manually: fastq_screen --get_genomes
+#   and config file prepared
+
+rule fastq_screen:
+    input: 'fastq_trimmed/{prefix}.fastq.gz'
+    output:
+        html = 'fscreen/{prefix}_screen.html',
+        txt = 'fscreen/{prefix}_screen.txt'
+    threads: 12
+    shell:
+        '''
+        fastq_screen --conf {FSCREEN_CONFIG} --outdir $TMPDIR/fscreen --threads {threads} {input}
+        mv $TMPDIR/fscreen/{wildcards.prefix}_screen.html {output.html}
+        mv $TMPDIR/fscreen/{wildcards.prefix}_screen.txt {output.txt}
+        '''
+
+####################################################################
+# Final multiqc from fastqc and fast_screen
+
+rule multiqc:
+    input:
+        fscreen = FSCREENS,
+        qc = QCS,
+        trimmed = expand('fastq_trimmed/{sample}_report.html', sample = SAMPLES)
+    output: 'multiqc/report.html'
+    shell:
+        'multiqc -f --filename report --outdir multiqc fastq_trimmed qc fscreen'
+
+####################################################################
+# Count reads
+
+rule count_trimmed:
+    input: 'fastq_trimmed/{sample}_R1.fastq.gz'
+    output: 'fastq_trimmed/{sample}_count.txt'
+    shell:
+        'zcat {input} | echo $((`wc -l`/4)) > {output}'
+
+####################################################################
+# Load genome files
+
+rule load_genome:
+    output: 
+        human = HUMAN_GENOME_FILE,
+        dm = DM_GENOME_FILE
+    shell:
+        '''
+        wget {HUMAN_GENOME_URL} -O - | gunzip -c > {output.human}
+        wget {DM_GENOME_URL} -O - | gunzip -c > {output.dm}
+        '''
+
+rule human_canonical_fasta:
+    input: HUMAN_GENOME_FILE
+    output: HUMAN_CANONICAL_FILE
+    params: 
+        chroms = " ".join(CANONICAL_CHROMS)
+    shell:
+        r"""
+        # Index if needed, then extract only the canonical chromosomes
+        samtools faidx {input}
+        samtools faidx {input} {params.chroms} > {output}
+        """
+
+
+rule index_genome:
+    input: HUMAN_CANONICAL_FILE
+    output:
+        index = HUMAN_GENOME_INDEX,
+        sizes = HUMAN_CHROM_SIZES
+    shell:
+        r"""
+        samtools faidx {input}
+
+        # Extract the first two columns (chrom name, length)
+        cut -f1,2 {input}.fai > {output.sizes}
+        """
+
+####################################################################
+# bowtie
+
+rule build_index:
+    input:
+        lambda wc: GENOMES[wc.genome]["fasta"]
+    output:
+        # Explicit patterns with the {genome} wildcard
+        f"{BOWTIE_INDEX_DIR}/{{genome}}.1.bt2",
+        f"{BOWTIE_INDEX_DIR}/{{genome}}.2.bt2",
+        f"{BOWTIE_INDEX_DIR}/{{genome}}.3.bt2",
+        f"{BOWTIE_INDEX_DIR}/{{genome}}.4.bt2",
+        f"{BOWTIE_INDEX_DIR}/{{genome}}.rev.1.bt2",
+        f"{BOWTIE_INDEX_DIR}/{{genome}}.rev.2.bt2"
+    params:
+        dir    = BOWTIE_INDEX_DIR,
+        prefix = lambda wc: BOWTIE_INDEX_PREFIX[wc.genome]
+    shell:
+        r"""
+        mkdir -p {params.dir}
+        bowtie2-build {input} {params.prefix}
+        """
+
+# Map to either human or dm, depending on {genome} in the output
+rule bowtie_mapping:
+    input:
+        R1  = "fastq_trimmed/{sample}_R1.fastq.gz",
+        R2  = "fastq_trimmed/{sample}_R2.fastq.gz",
+        idx = lambda wc: BOWTIE_INDEX_FILES[wc.genome]
+    output:
+        bam     = "bam_{genome}/{sample}.bam",
+        bai     = "bam_{genome}/{sample}.bam.bai",
+        summary = "bam_{genome}/{sample}.summary.txt"
+    threads: 8
+    params:
+        idx_prefix = lambda wc: BOWTIE_INDEX_PREFIX[wc.genome],
+        extra      = lambda wc: GENOMES[wc.genome]["params"],
+        rg         = lambda wc: f"@RG\\tID:Group\\tSM:{wc.sample}\\tPL:Illumina\\tLB:Library.fa"
+    shell:
+        r"""
+        mkdir -p $(dirname {output.bam}) $(dirname {output.summary})
+
+        bowtie2 \
+            -x {params.idx_prefix} \
+            -1 {input.R1} -2 {input.R2} \
+            {params.extra} \
+            -p {threads} \
+        2> {output.summary} \
+        | samtools view -b \
+        | samtools sort -@ {threads} \
+        | samtools addreplacerg -r '{params.rg}' -o {output.bam} -
+
+        samtools index {output.bam}
+        """
+
+####################################################################
+# De-duplicated BAM files
+
+rule picard_dedup:
+    input:
+        "bam_human/{sample}.bam"
+    output:
+        bam     = "bam_human/{sample}_dedup.bam",
+        bai     = "bam_human/{sample}_dedup.bai",
+        metrics = "bam_human/{sample}_dedup.metrics.txt"
+    threads: 4
+    params:
+        extra = "-REMOVE_DUPLICATES true -ASSUME_SORTED true -VALIDATION_STRINGENCY SILENT"
+    shell:
+        r"""
+        mkdir -p $TMPDIR/picard
+
+        picard MarkDuplicates \
+            -I {input} \
+            -O {output.bam} \
+            -M {output.metrics} \
+            {params.extra} \
+            -CREATE_INDEX true
+        """
+
+####################################################################
+# Counts per chromosome
+
+rule chr_counts:
+    input: 
+        bam = 'bam_human/{sample}_dedup.bam',
+        bai = 'bam_human/{sample}_dedup.bai'
+    output: 'chrcount/{sample}.txt'
+    threads: 8
+    shell:
+        'samtools idxstats {input.bam} > {output}'
+
+
+
+####################################################################
+# Qualimap
+
+rule qualimap_bamqc:
+    input:
+        bam = 'bam_{genome}/{sample}.bam',
+        bai = 'bam_{genome}/{sample}.bam.bai'
+    output: 'qm_{genome}/{sample}/genome_results.txt'
+    threads: 8
+    params:
+        mem = '24G'
+    shell:
+        '''
+        rm -fR qm_{wildcards.genome}/{wildcards.sample}
+        qualimap bamqc -nt {threads} -bam {input.bam} -outdir qm_{wildcards.genome}/{wildcards.sample} --java-mem-size={params.mem}
+        '''
+
+###################################################################
+# Keep high-confidence nuclear ATAC fragments
+
+rule filter_mito_bam:
+    input:
+        bam = "bam_human/{sample}_dedup.bam"
+    output:
+        bam = "bam_human/{sample}.noMT.bam",
+        bai = "bam_human/{sample}.noMT.bam.bai"
+    params:
+        chroms = " ".join(NUCLEAR_CHROMS),
+        min_mapq = 30,
+        exclude_flags = 3852
+    shell:
+        r"""
+        samtools view \
+            -b \
+            -f 2 \
+            -F {params.exclude_flags} \
+            -q {params.min_mapq} \
+            {input.bam} \
+            {params.chroms} \
+        > {output.bam}
+        samtools index {output.bam}
+        """
+
+###################################################################
+# Merge BAM replicates
+
+rule merge_bam_replicates:
+    input:
+        lambda wildcards: expand(
+            "bam_human/{sample}.noMT.bam",
+            sample=GROUP_TO_SAMPLES[wildcards.group]
+        )
+    output:
+        bam = "bam_human/{group}.merged.bam",
+        bai = "bam_human/{group}.merged.bam.bai"
+    threads: 8
+    shell:
+        r"""
+        samtools merge -@ {threads} {output.bam} {input}
+        samtools index {output.bam}
+        """
+
+
+
+####################################################################
+# Create bedgraphs from BAM files
+
+rule bam_to_bedgraph:
+    input:
+        bam        = "bam_human/{sample}.noMT.bam",
+        bai        = "bam_human/{sample}.noMT.bam.bai",   
+        chromsizes = HUMAN_CHROM_SIZES
+    output:
+        bg = "bedgraph/{sample}.bedgraph"
+    threads: 4
+    log:
+        "logs/bam_to_bedgraph/{sample}.bedgraph.log"
+    shell:
+        r"""
+        (
+          mkdir -p $(dirname {output.bg})
+
+          # Create paired-fragment coverage bedGraph from coordinate-sorted BAM.
+          bedtools genomecov \
+            -ibam {input.bam} \
+            -bg \
+            -pc \
+            -g {input.chromsizes} \
+          > {output.bg}
+        ) &> {log}
+        """
+
+
+####################################################################
+# Create bigWigs from bedGraphs
+
+rule make_bigwigs:
+    input: 
+        bg = "bedgraph/{sample}.bedgraph",
+        chromsizes = HUMAN_CHROM_SIZES
+    output:
+        bw = "bigwig/{sample}.bw"
+    log:
+        "logs/make_bigwigs/{sample}.log"    
+    shell:
+        r"""
+        (
+          mkdir -p bigwig
+
+          bedGraphToBigWig {input.bg} {input.chromsizes} {output.bw}
+        ) &> {log}
+        """
+
+####################################################################
+# MACS3 peak calling on normalised bedgraphs
+# NOT USED
+
+rule macs3_bdgpeakcall:
+    input:
+        bg = "bedgraph/{sample}.bedgraph"
+    output:
+        peaks = "macs3_spike/{sample}_peaks.bed"
+    params:
+        cutoff  = 1.0,          # score cutoff on the 4th column of our bedGraph
+        minlen  = 200,          # minimum peak length (bp)
+        maxgap  = 30,           # max gap allowed within a peak
+        outdir  = "macs3_spike"
+    shell:
+        r"""
+        mkdir -p {params.outdir}
+
+        macs3 bdgpeakcall \
+            -i {input.bg} \
+            -c {params.cutoff} \
+            -l {params.minlen} \
+            -g {params.maxgap} \
+            --outdir {params.outdir} \
+            -o {wildcards.sample}_peaks.bed
+        """
+
+####################################################################
+# MACS3 peak calling on BAM files
+
+
+rule macs3_callpeak_broad:
+    input:
+        bam = "bam_human/{sample}.noMT.bam" 
+    output:
+        broadpeak  = "macs3/broad/{sample}_peaks.broadPeak",
+        gappedpeak = "macs3/broad/{sample}_peaks.gappedPeak",
+        xls        = "macs3/broad/{sample}_peaks.xls"
+    params:
+        outdir = "macs3/broad",
+        name   = "{sample}",
+        genome = "hs",   
+        extra  = "--keep-dup all --broad -q 0.01 --broad-cutoff 0.01"
+    threads: 8
+    log:
+        "logs/macs3_broad/{sample}.log"
+    shell:
+        r"""
+        mkdir -p {params.outdir}
+
+        macs3 callpeak \
+            -t {input.bam} \
+            -f BAMPE \
+            -g {params.genome} \
+            {params.extra} \
+            -n {params.name} \
+            --outdir {params.outdir} &> {log}
+        """
+
+rule macs3_callpeak_narrow:
+    input:
+        bam = "bam_human/{sample}.noMT.bam" 
+    output:
+        narrowpeak = "macs3/narrow/{sample}_peaks.narrowPeak",
+        bed        = "macs3/narrow/{sample}_summits.bed",
+        xls        = "macs3/narrow/{sample}_peaks.xls"
+    params:
+        outdir = "macs3/narrow",
+        name   = "{sample}",
+        genome = "hs",   
+        extra  = "--keep-dup all -q 0.01"
+    threads: 8
+    log:
+        "logs/macs3_narrow/{sample}.log"
+    shell:
+        r"""
+        mkdir -p {params.outdir}
+
+        macs3 callpeak \
+            -t {input.bam} \
+            -f BAMPE \
+            -g {params.genome} \
+            {params.extra} \
+            -n {params.name} \
+            --outdir {params.outdir} &> {log}
+        """
