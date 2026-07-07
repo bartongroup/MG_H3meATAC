@@ -40,10 +40,6 @@ BOWTIE_INDEX_DIR = "bowtie_index"
 
 # Define genomes with their specific parameters
 GENOMES = {
-    "human_one": {
-        "fasta": HUMAN_CANONICAL_FILE,
-        "params": "--end-to-end --very-sensitive --no-mixed --no-discordant --dovetail --phred33 -I 0 -X 2000",
-    },
     "human": {
         "fasta": HUMAN_CANONICAL_FILE,
         "params": "--end-to-end --very-sensitive --no-mixed --no-discordant --dovetail --phred33 -I 0 -X 2000",
@@ -116,12 +112,12 @@ BEDGRAPHS = expand("bedgraph/{sample}.bedgraph", sample = SAMPLES)
 BIGWIGS = expand("bigwig/{sample}.bw", sample = SAMPLES)
 MACS3_NARROW_PEAKS = expand("macs3/narrow/{sample}_peaks.narrowPeak", sample = SAMPLES)
 MERGED_BAMS = expand("bam_human/{group}.merged.bam", group = GROUPS)
-
+SPIKEINS = expand("spikein/{sample}.spikein_depth.txt", sample = SAMPLES)
 
 ####################################################################
 
 rule all:
-    input: ENVIRONMENT + CHRSTATS + MULTIQC + TRIM_COUNTS + CHRSTATS + QUALIMAPS + MACS3_NARROW_PEAKS + BEDGRAPHS
+    input: ENVIRONMENT + CHRSTATS + MULTIQC + TRIM_COUNTS + CHRSTATS + QUALIMAPS + MACS3_NARROW_PEAKS + BEDGRAPHS + SPIKEINS
 
 ####################################################################
 # Save environment
@@ -454,6 +450,25 @@ rule make_bigwigs:
           bedGraphToBigWig {input.bg} {input.chromsizes} {output.bw}
         ) &> {log}
         """
+
+####################################################################
+# Spikein depths for normalisation
+rule spikein_depth:
+    input:
+        bam = "bam_dm/{sample}.bam"
+    output:
+        depth = "spikein/{sample}.spikein_depth.txt",
+        scale = "spikein/{sample}.spikein_scale.txt"
+    shell:
+        r"""
+        mkdir -p spikein
+        total_reads=$(samtools view -F 0x04 {input.bam} | wc -l)
+        seq_depth=$(( total_reads / 2 ))
+        echo "$seq_depth" > {output.depth}
+        scale_factor=$(echo "{SPIKEIN_TARGET_DEPTH} / $seq_depth" | bc -l)
+        echo "$scale_factor" > {output.scale}
+        """
+
 
 ####################################################################
 # MACS3 peak calling on normalised bedgraphs

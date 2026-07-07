@@ -1,0 +1,24 @@
+info/*
+fastq_trimmed/*.txt
+fastq_clean/*.txt
+fscreen/*.txt
+genome/chrom_sizes.txt
+genome/Homo_sapiens.canonical*
+chrcount/*
+qc/*.zip
+multiqc/*.html
+bam_dm/*.txt
+bam_human/*.txt
+# bam_human/*.noMT.bam
+# bam_human/*.noMT.bam.bai
+# qm_human/**
+# qm_dm/**
+spikein/*.txt
+macs3/narrow/*.narrowPeak
+fastq_screen.conf
+Snakefile
+environment.txt
+config/*
+*.sh
+spec-file.txt
+fastq_files.txt

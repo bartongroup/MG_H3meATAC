@@ -1,0 +1,17 @@
+raw_sample,group,replicate
+CA1ctleiPS,iPS_Ctrl,1
+CA2ctleiPS,iPS_Ctrl,2
+CA3ctleiPS,iPS_Ctrl,3
+CA4ctleiPS,iPS_Ctrl,4
+CA1setdb1iPS,iPS_SETDB1,1
+CA2setdb1iPS,iPS_SETDB1,2
+CA3setdb1iPS,iPS_SETDB1,3
+CA4setdb1iPS,iPS_SETDB1,4
+CA1ctlePSM,48h_Ctrl,1
+CA2ctlePSM,48h_Ctrl,2
+CA3ctlePSM,48h_Ctrl,3
+CA4ctlePSM,48h_Ctrl,4
+CA1setdb1PSM,48h_SETDB1,1
+CA2setdb1PSM,48h_SETDB1,2
+CA3setdb1PSM,48h_SETDB1,3
+CA4setdb1PSM,48h_SETDB1,4

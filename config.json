@@ -1,0 +1,27 @@
+{
+  "species" : "human",
+  "ensembl" : {
+    "biomart" : "ENSEMBL_MART_ENSEMBL",
+    "dataset" : "hsapiens_gene_ensembl",
+    "version" : "115"
+  },
+  "data_path" : "cluster",
+  "remote_path" : "/Volumes/mgierlinski/projects/h3meatac/",
+  "yaml_file" : "cluster/config/config.yaml",
+  "metadata_file" : "info/metadata.csv",
+  "dir" : {
+    "genome" : "genome",
+    "fastq_trimmed" : "fastq_trimmed",
+    "fastq_clean" : "fastq_clean",
+    "fastq_screen" : "fscreen",
+    "chr_count" : "chrcount",
+    "qc" : "qc",
+    "bam" : "bam_human",
+    "bam_dm" : "bam_dm",
+    "spike_norm" : "spikein",
+    "bigwig" : "bigwig",
+    "macs_broad" : "macs3/broad",
+    "macs_narrow" : "macs3/narrow"
+  },
+  "sample_file" : "cluster/config/samples.txt"
+}

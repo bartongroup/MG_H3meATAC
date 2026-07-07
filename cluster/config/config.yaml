@@ -1,0 +1,17 @@
+ensembl_dir: ftp://ftp.ensembl.org/pub/release-
+
+fastq_screen_config: config/fastq_screen.conf
+
+read_length: 150
+
+reference:
+    release: 115
+    genome_path: homo_sapiens
+    genome_name: Homo_sapiens.GRCh38
+    genome_suffix: .dna.primary_assembly.fa
+    dm_path: drosophila_melanogaster
+    dm_name: Drosophila_melanogaster.BDGP6.54
+    dm_suffix: .dna.toplevel.fa
+
+samples: config/samples.txt
+sample_groups: config/groups.csv 

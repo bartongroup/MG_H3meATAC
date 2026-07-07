@@ -1,0 +1,11 @@
+tidyverse
+readxl
+janitor
+lobstr
+jsonlite
+ggbeeswarm
+cowplot
+broom
+progress
+BiocGenerics
+GenomeInfoDb

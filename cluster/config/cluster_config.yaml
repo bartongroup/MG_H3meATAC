@@ -1,0 +1,18 @@
+{
+    "qualimap_rnaseq":
+    {
+        "jc": "short",
+        "mem_free": "16G",
+        "threads": "1",
+        "local_free": "16G",
+        "ramodisk": "0G"
+    },
+    "__default__":
+    {
+        "jc": "short",
+        "mem_free": "32G",
+        "threads": "1",
+        "local_free": "10G",
+        "ramdisk": "0G"
+    }
+}
