@@ -1,0 +1,926 @@
+---
+title: "H3K9me3 ATAC-seq analysis"
+author:
+  - name: Marek Gierlinski
+    affiliations: Data Analysis Group
+    note: "Creator of this report"
+  - name: Jane Wright
+    affiliations: Genome Integrity
+    note: Proponent
+  - name: Constance Alabert
+    affiliations: MCDB
+    note: PI
+    
+date: today
+date-format: "D MMMM YYYY"
+execute:
+  echo: false
+  cache: true
+  warning: false
+format:
+  html:
+    theme:
+      - journal
+      - report.scss
+    toc: true
+    number-sections: true
+self-contained: true
+bibliography: references.bib
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+```{r libraries}
+suppressPackageStartupMessages({
+  library(ggplot2)
+  library(tidyr)
+  library(dplyr)
+  library(purrr)
+  library(stringr)
+  library(forcats)
+  library(readr)
+  library(targets)
+  library(gt)
+  library(cowplot)
+})
+tar_config_set(store = "../_targets")
+```
+
+```{r}
+#| label: table-functions
+gt_table <- function(s) {
+  s |> 
+    gt::gt() |> 
+    gt::tab_options(
+      table.align = "center",
+      heading.align = "center",
+      data_row.padding = gt::px(3)
+    ) |> 
+    gt::opt_table_font(
+      font = c(
+        gt::default_fonts()
+      )
+    )
+}
+```
+
+# Proposal
+
+We would like DAG to:
+
+ - Analyse ATAC-seq samples in human iPSCs before (0h) and after 48 hr of differentiation along the mesoderm pathway (48h).
+ - Compare ATAC-seq (from Nicola) and H3K9me3-CUT&TAG (from Jane)
+
+## Context
+
+Upon differentiation, cells acquire a new transcription program driven by TFs and profound changes in chromatin architecture. Underlying cellular process that elicit these changes remain poorly understood. During cell fate transitions, iPSCs switch from largely open chromatin structures to heterochromatin formation, more specifically: silencing of repetitive regions, pluripotent genes and alternative lineages, and activation of lineage specific genes. A large body of work shows that DNA replication alters chromatin and could promote cell fate changes. For instance, recent evidence revealed that changes in accessibility for lineage specific TF appear first on newly replicated DNA (Knudsen et al 2026). However, the molecular mechanisms driving these changes remain to be identified.
+
+Jane’s project aims to identify factors and replication coupled mechanisms that enable cell fate changes. We used human iPSCs as a model as they exit pluripotency and engage into mesoderm differentiation.
+
+ - We have identified over100 proteins that are recruited to replication forks upon differentiation.
+ - We have identified the ones that may act as first responders as they are already present in iPSCs – this includes the H3K9me1/2/3 methyltransferase SETDB1.
+ - We showed that SETDB1 is important for differentiation of iPSCs into PSM cells
+
+Therefore, **our working hypothesis is that SETDB1, through a DNA replication coupled mechanism, establish de novo H3K9me3 on repetitive regions and/or restrict accessibility to pluripotency TF and alternative lineage TFs**. Indeed, H3K9me3 does prevent access of TF, including pioneer TFs (Becker et al 2016, Nicetto and Zaret 2019).
+
+To test our hypothesis:
+
+ - We have identified regions that gain H3K9me3 upon diff, and which ones rely on SETDB1: We have performed H3K9me3 CUT & TAG +/- differentiation +/- SETDB1. Marek has recently analysed this dataset, and we confirmed an increase of regions covered with H3K9me3 upon differentiation.
+ - To identify regions losing (and gaining) chromatin accessibility upon differentiation, and which ones are under the control of SETDB1, we have performed ATAC-seq +/- differentiation +/- SETDB1. This is the dataset we’d like DAG to analyse. Nicola has already worked on it and confirmed it works, but she used a different pipeline than the one Marek used for Jane’s H3K9me3 CUT&TAG. This is particularly relevant for the next point.
+ - We wonder whether the ATAC-seq and H3K9me3 CUT&TAG anticorrelate: Are the regions gaining H3K9me3 upon differentiation, the regions that loose chromatin accessibility? This is the comparison we’d like DAG to perform using ATAC-seq and CUT&TAG H3K9me3 Datasets. These same cellular samples were used in parallel for two techniques: 1) H3K9me3 Cut and Tag (Read mapping and analysis already performed by Marek, but a few small issues remain (see other word document). 2) ATACseq (Read mapping has been done by Nicola Wiechens and samples look good, technically it has worked as expected). 
+
+## Experiment that we performed: Samples and Conditions
+
+We are analysing iPS cells before (0h) and after differentiation (48h), and an siRNA treatments, yielding four biological conditions:
+
+ - 0h control siRNA 
+ - 0h SETDB1 siRNA 
+ - 48h control siRNA 
+ - 48h SETDB1 siRNA 
+
+Each condition was repeated four times with fresh cells so there are four replicates, 16 samples in total for both ATAC-seq and H3K9me3 Cut and Tag. 
+
+**Sequencing depth**
+
+ATAC-seq: 60 million paired end (150bp) reads per sample. 
+
+** Drosophila spike in **
+
+Drosophila melanogaster nuclei as a heterologous spike-in control were present in every CUT and Tag sample to use as a reliable normalization strategy. When the Cut and Tag data were normalized with spike-in volcano plots showed visually what we expected (we see more H3K9me3 in total by MS upon differentiation) but unfortunately there was a distorted distribution of p-values. The same spike in was added to ATAC-seq replicates but only the last two replicates had the spike in.
+
+## Important Biological Questions for analysis
+
+1. Which genomic regions are accessible across the genome in 0h and 48h? ATAC-seq
+
+2. Differential analysis: How do these peaks change during differentiation and change with SETDB1 knockdown? ATAC-seq. Here, we are interested in the following pairwise contrasts:
+
+ - 0h siCtrl - 48h siCtrl
+ - 48h siCtrl - 48h siSETDB1
+ - 0h siCtrl - 0h siSETDB1
+ - 0h siSETDB1 - 48h siSETDB1
+
+We always want to distinguish between up and downregulated peaks, ideally using both a p-value and log 2 FC thresholds.
+
+3. Since changes in ATAC-seq accessibility are associated with changes in TF binding ability, we want to include Motif enrichment analysis for transcription factor motifs, ideally using HOMER.
+
+4. Correlate ATAC-seq changes with H3K9me3 changes. Are the regions that lose accessibility the ones that gain H3K9me3? Inverse correlation of ATAC-seq and CUT&TAG H3K9me3 peaks.
+
+
+## Existing data that may be useful to compare to
+
+Teresa Knudsen et al. 2026: https://www.sciencedirect.com/science/article/pii/S2213671126000329?__cf_chl_rt_tk=CVsv82.bNgxx7HgfwRAM2SjqU2sIpd8hmTWPrSL168M-1779787178-1.0.1.1-LcF.R5hnMM8lz2lYvqRZPisU0Q8bv8C.GhFlQ_7fV10
+
+
+
+
+# Data analysis
+
+The data analysis was conducted in two stages. The first stage was carried out on the Life Sciences cluster using a Snakemake script. This stage encompassed the cleaning, quality control, and mapping of FASTQ files. The software versions employed in this stage are listed in @sec-cluster-software. In the second stage, the data were imported into [Positron](https://github.com/posit-dev/positron) and further processed using R. The versions of the R packages utilized are detailed in @sec-packages. All code used in this project is available on [GitHub](https://github.com/bartongroup/MG_H3meATAC).
+
+# Design
+
+@tbl-metadata presents the full experimental design. The `Sample` column contains the sample names referenced throughout this report.
+
+```{r}
+#| label: tbl-metadata
+#| tbl-cap: Design of the experiment.
+tar_read(metadata) |> 
+  select(Sample = sample, `Original sample` = raw_sample, `Time point` = time_point, Treatment = treatment, Group = group, Replicate = replicate) |> 
+  gt_table() |> 
+  cols_align(
+    align = "left",
+    columns = c("Sample", "Original sample", "Group")
+  )
+```
+
+
+
+
+## Sequencing
+
+Sequencing was done by Novogene. We have received 2x150 bp paired-end reads.
+
+## FastQ screen {#sec-fastq-screen}
+
+[FastQ
+screen](https://www.bioinformatics.babraham.ac.uk/projects/fastq_screen/)
+was used to map a sample of reads to several genomes to check for
+contamination. @fig-fscreen shows one hit one genome percentage. Note,
+the fill scale is logarithmic with grey indicating zero. There is no
+notable contamination from other organisms.
+
+There is, however, a surprisingly large proportion of Drosophila hits from di-methyl samples (Me2). @tbl-fscreen shows the numbers of reads aligned to each genome. *Fastq Screen* maps 100,000 randomly selected reads to each genome. While in tri-methyl samples Drosophila receives ~1000 hits per sample -- much less than a typical 40,000-50,000 human hits -- in di-methyl samples Drosophila hits are often *much* larger than the human reads, and the drosophila/human ratio of the counts varies dramatically between samples. This shows that something went wrong with the spike-ins.
+
+```{r}
+#| label: fig-fscreen
+#| fig-cap: Fscreen results, one hit per one genome and multiple hits per one genome are inluded. The colour scale is logarithmic and grey indicates no hits.
+#| fig-width: 6
+#| fig-height: 4
+tar_read(fig_fscreen)
+```
+
+
+
+```{r}
+#| label: tbl-fscreen
+#| tbl-cap: FastQ screen one hit per genome counts. FastQ screen samples 100,000 random reads from each FASTQ file to do the mapping.
+tar_read(fscrn) |>
+  filter( name == "#One_hit_one_genome") |>
+  pivot_wider(id_cols = Genome, names_from = sample, values_from = value) |>
+  arrange(desc(iPS_Ctrl_3)) |> 
+  gt_table()
+```
+
+## Read quality
+
+@fig-read-qual shows read quality as a function of base pair position,
+@fig-read-qual-clust shows hierarchical clustering based on read
+quality. This has nothing to do with biology, but rather shows potential
+batch effects related to sequencing, e.g. different flow cells,
+different instruments. 
+
+```{r}
+#| label: fig-read-qual
+#| fig-cap: Read quality.
+#| fig-width: 8
+#| fig-height: 3
+tar_read(fig_read_qual) 
+```
+
+```{r}
+#| label: fig-read-qual-clust
+#| fig-cap: Clustering based on read quality.
+#| fig-width: 4
+#| fig-height: 5
+tar_read(fig_read_qual_clust)
+```
+
+## Mapping
+
+```{r}
+#| label: config
+tar_load(c(config, params))
+```
+
+[Bowtie2](https://bowtie-bio.sourceforge.net/bowtie2/index.shtml) was used to map reads to the human GRCh38 and drosophila BDGP6.54 genomes. Only canonical chromosomes 1-23, X, Y and MT were used from the human genome (Ensembl genome FASTA contains a lot of additional patches and haplotypes, that can lead to redundancy in mapping).
+
+Following recommendations from the [CUT&Tag tutorial](https://yezhengstat.github.io/CUTTag_tutorial/#31_Bowtie2_alignment_[required]) (@Zheng_2020), the parameters used for the human genome were:
+
+```
+--end-to-end --very-sensitive --no-mixed --no-discordant --phred33 -I 10 -X 700 -k 10
+```
+
+`-k 10` was included to instruct *bowtie2* to report up to 50 loci for reads mapping to multiple loci.
+
+For the drosophila, two additional parameters were used: `--no-overlap --no-dovetail`, but no `-k 10`.
+
+### Note on multi-mapping reads
+
+Initially, I tried using -k 50 option in *bowtie2*, which reported up to 50 loci for multi-mapping reads. This created absolutely massive BAM files (up to 10 GB), which were difficult to handle. I looked at the multi-mapping levels. @tbl-multi-mapping shows the distribution of multi-mapping levels for one of the samples. The multi-mapping levels drops very quickly with the loci count, but there are still many reads with 50 or more multi-mapping loci. Therefore, I decided it would not make much difference to reduce the multi-mapping reporting to -k 10, which results in smaller BAM files (up to 3 GB). This will report up to 10 loci for multi-mapping reads, which should be sufficient for our purposes. 
+
+```{r}
+#| label: tbl-multi-mapping
+#| tbl-cap: Multi-mapping levels when -k 50 was used, for one particular sample (Me3_iPS_Nt_rep4).
+#  gt_table()
+#read_tsv("../info/multi_mapping_levels.tsv")  |> 
+```
+
+
+## Mapping properties
+
+@fig-bowtie-sum shows mapping summaries. There is a dramatic difference between di-methyl and try-methyl samples, with much higher drosophila levels in di-methyl data.
+
+```{r}
+#| label: fig-bowtie-sum
+#| fig-cap: Mapping summaries from bowtie2 for the (A) human and (B) drosophila alignments.
+#| fig-width: 8
+#| fig-height: 6
+pl1 <- tar_read(fig_bowtie_sum_human)
+pl2 <- tar_read(fig_bowtie_sum_dm)
+plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
+```
+
+## Duplication levels
+
+`picard MarkDuplicates` was used to mark and count duplicates in the BAM files. @fig-picard-dup shows the duplication levels for all samples. Di-methyl samples show increased level of duplication.
+
+```{r}
+#| label: fig-picard-dup
+#| fig-cap: Duplication levels in the human alignments.
+#| fig-width: 4
+#| fig-height: 5
+tar_read(fig_picard_dup)
+```
+
+## Spike-in properties
+
+@sec-fastq-screen showed a large proportion of Drosophila reads in di-methyl samples based on random 100,000 reads. @fig-spikein-ratios shows the percentage of Drosophila in all mapped reads. Di-methyl samples contain a lot of Drosophila reads, in some cases there is more Drosophila than human. Also, the percentage of Drosophila varies a lot between replicates. In contrast, the fraction of Drosophila reads in tri-methyl samples consistently stays well below 1%.
+
+```{r}
+#| label: fig-spikein-ratios
+#| fig-cap: The percentage of spikein mapped reads (both single- and multi-mapping) in the total mapped reads (both drosophila and human).
+#| fig-width: 4
+#| fig-height: 5
+tar_read(fig_spikein_ratios)
+```
+
+## Read count per chromosome
+
+@fig-chrom-reads shows the number of reads mapped to each chromosome, per sample. Di-methyl reads consitently show a higher count of mitochondrial reads. See also the next Section.
+
+```{r}
+#| label: fig-chrom-reads
+#| fig-cap: Mapped read count per chromosome for each sample.
+#| fig-width: 8
+#| fig-height: 30
+tar_read(fig_chrom_reads) 
+```
+
+## Mitochondrial read proportion
+
+@fig-mito-prop shows the proportion of reads mapping to mitochondrial chromosome across all samples. Di-methyl samples show a high proportion of mitochondrial reads.
+
+```{r}
+#| label: fig-mito-prop
+#| fig-cap: Percentage of reads mapping to mitochondrial chromosome.
+#| fig-width: 4
+#| fig-height: 4
+tar_read(fig_mitochondrial_prop) 
+```
+
+## Full QC report
+
+The full quality-control report, based on *FastQC*, *FastQ Screen*,
+*STAR* and *QualiMap*, is available
+[here](https://www.compbio.dundee.ac.uk/user/mgierlinski/hipposeq/rna_seq/multiqc/report.html).
+
+# Di-methyl samples
+
+There seem to be serious issues with di-methyl samples. They:
+
+ - they contain a high proportion of Drosophila genome, more than the human in some samples,
+ - they show higher duplication levels than tri-methyl data,
+ - they have a much higher proportion of mitochondrial genome than tri-methyl samples
+
+ We decide not to use di-methyl data for further analysis at this moment.
+
+# Filtering and normalisation
+
+Mitochondrial reads are usually uninformative background, and they can inflate the sequencing depth, duplicate rates and distort normalisation. Therefore, the reads mapping to the mitochondrial chromosome were removed from the BAM files.
+
+## Spike-in normalisation
+
+### Normalisation from sequencing depths
+
+NOTE: this is not in use.
+
+The total count of read mapped to the Drosophila genome was used to create normalisation factors for methylation data. The normalisation factors are found as
+
+$$
+f_i = \frac{10^6}{S_i},
+$$
+
+where $S_i$ is the sequencing depths (calculated using `samtools view -F 0x04 <bam_file> | wc -l`) in spike-in sample $i$. They are shown in @fig-scale-factors.
+
+```{r}
+#| label: fig-scale-factors
+#| fig-cap: Sequencing depths and scaling factors from spike-in Drosophila sequences. Only tri-methyl samples are shown.
+#| fig-width: 5
+#| fig-height: 4
+tar_read(fig_spikein_norms) 
+```
+
+## Diffbind normalisation
+
+*DiffBind* package can apply spike-in normalisation internally, when provided with spike-in BAM files. The normalisation factors calculated by *DiffBind* are slightly different from the above, as they take into account only reads within consensus peaks. The comparison between the two methods is shown in @fig-compare-spikein-norm.
+
+
+```{r}
+#| label: fig-compare-spikein-norm
+#| fig-cap: Comparison of spike-in normalisation calculated from sequencing depths (horizontal axis) and from DiffBind (vertical axis).
+#| fig-width: 4
+#| fig-height: 3
+# tar_read(fig_compare_spikein_norm)
+```
+
+## Which normalisation to use
+
+CUT&Tag, like any other sequencing experiment, is compositional, because the abundance (composition) of each peak is relative to all others. No absolute abundances can be inferred directly from sequencing data. Spike-in normalisation in methylation experiments is intended to help identify global changes in methylation between conditions. On the other hand, the amount of spike-in material cannot be controlled precisely, and in some cases spike-ins can add noise to the data.
+
+To assess the applicability of spike-ins, the total abundance across all peaks (over all chromosomes) was calculated for each sample under three normalisation schemes: no normalisation (raw counts), sequencing depth (library size) normalisation, and spike-in normalisation. If there is a global change in methylation between conditions (for example, an increase upon differentiation) then all four replicates under spike-in normalisation should show an increase in total abundance.
+
+The results of this test are shown in @fig-norm-comp. Unfortunately, spike-in normalisation yields markedly inconsistent results between replicates. Upon differentiation (48 h) there is a sign of increased total abundance, but only in two out of four replicates. In particular, Me3_48h_Ctrl shows a 6.6-fold variation between replicates when spike-in normalisation is applied.
+
+We note that the large variation in spike-in-normalised data for Me3_48h_Ctrl may be due to (at least) two reasons. First, the spike-ins may have been unreliable, with the amount of Drosophila DNA added varying between samples. However, there is a second possibility. In @fig-norm-comp we see that after spike-in normalisation the total peak counts are stable in iPS_Ctrl but increase with treatment and time, with a large spread at 48 h. It is therefore possible that different replicates responded differently to siRNA and time, leading to genuine differences in total methylation. Unfortunately, we cannot determine which of these two scenarios actually occurred.
+
+::: {.callout-warning}
+
+The large variance in spike-in normalised data, caused either by inconsistent spike-ins or erratic response from treated cells, makes analysis of spike-in normalised data unreliable.
+
+:::
+
+
+
+```{r}
+#| label: fig-norm-comp
+#| fig-cap: "Comparison of normalisations: (A) raw counts, (B) library size and (C) spike-in. The vertical axis shows the total normalised abundance across all peaks in each sample."
+#| fig-width: 8
+#| fig-height: 4
+# tar_read(fig_norm_compare)
+```
+
+Another illustration of the same issues is shown in @fig-compare-spikein-libsize-norm. It shows the effects of library size and spike-in normalisation methods on peak signals. While library size normalisation shows little change between samples, spike-in normalisation leads to substantial differences in peak signals between *replicates* in the same condition. 
+
+```{r}
+#| label: fig-compare-spikein-libsize-norm
+#| fig-cap: A segment of chromosome 11. The panels show normalised counts in peaks, calculated by *DiffBind* and extracted from `binding` field in the *DiffBind* object, using (A) library size normalisation and (B) spike-in normalisation.
+#| fig-width: 8
+#| fig-height: 6
+# pl2 <- tar_read(fig_peaks_chr11_spike_narrow)
+pl1 <- tar_read(fig_peaks_chr11_libs_narrow)
+# plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
+```
+
+
+
+# Peak detection
+
+[MACS3](https://macs3-project.github.io/MACS/) was used to detect peaks directly from MT-cleaned BAM files. Both narrow and broad peaks were detected. Following recommendations of @Abbasova_2022, these parameters were used for broad peak calling:
+
+```
+--keep-dup all --nolambda --nomodel --broad -q 0.01 --broad-cutoff 0.01 -g hs
+```
+
+Though H3K9me3 tend to create broad peaks (e.g. @Hu_2022), a narrow peak calling was also performed for comparison, using these parameters:
+
+
+```
+--keep-dup all --nolambda --nomodel -q 0.01 -g hs
+```
+
+## Peak properties
+
+Peaks are detected everywhere. @fig-peak-chromosomes shows the distribution of narrow peaks across all chromosomes for one sample.
+
+```{r}
+#| label: fig-peak-chromosomes
+#| fig-cap: Narrow peak distribution across chromosomes for sample `Me3_iPS_Ctrl_1`.
+knitr::include_graphics("images/peaks_narrow_dist_ctrl.png")
+```
+
+There are hundreds of thousands of peaks detected in each sample, as seen in @fig-peak-count. There are slightly more broad peaks than narrow peaks.
+
+```{r}
+#| label: fig-peak-count
+#| fig-cap: Number of detected peaks per sample, for (A) narrow and (B) broad peaks.
+#| fig-width: 8
+#| fig-height: 4
+pl1 <- tar_read(fig_npeaks_narrow) + scale_y_continuous(expand = expansion(0, 0.03), limits = c(0, 220000))
+# pl2 <- tar_read(fig_npeaks_broad) + scale_y_continuous(expand = expansion(0, 0.03), limits = c(0, 220000))
+# plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
+```
+
+```{r}
+#| label: fig-peak-coverage
+#| fig-cap: Genome coverage by detected peaks per sample, for (A) narrow and (B) broad peaks.
+#| fig-width: 8
+#| fig-height: 4
+pl1 <- tar_read(fig_peak_coverage_narrow)
+# pl2 <- tar_read(fig_peak_coverage_broad)
+# plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B")) 
+```
+
+
+@fig-peak-width shows distribution of peak widths, across all samples, for narrow and broad peaks. Both distributions are similar for widths < 1000 bp, but broad peaks have a long tail of very wide peaks, extending well over 10,000 bp.
+
+```{r}
+#| label: fig-peak-width
+#| fig-cap: Width of peaks across all samples, for (A) narrow and (B) broad peaks.
+#| fig-width: 8
+#| fig-height: 4
+pl1 <- tar_read(fig_peak_width_narrow)
+# pl2 <- tar_read(fig_peak_width_broad)
+# plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
+```
+
+Nevertheless, both narrow and broad peak calling detect similar regions. @fig-peak-example-1 shows an example of two peaks detected by both methods. The stronger peak on the right is the same in both cases, while the left peak is wider is wide calling.
+
+```{r}
+#| label: fig-peak-example-1
+#| fig-cap: Example of a peak and the MACS peak detection for narrow and broad peaks. 
+#| fig-width: 6
+#| fig-height: 4 
+tar_read(fig_peak_example_1)
+```
+
+
+There are a few cases where broad peak calling detects only a few peaks in a broad region, while narrow peak calling detects hundreds of peaks. An example is shown in @fig-peak-example-2.
+
+```{r}
+#| label: fig-peak-example-2
+#| fig-cap: Example of a peak and the MACS peak detection for narrow and broad peaks. 
+#| fig-width: 6
+#| fig-height: 4 
+# tar_read(fig_peak_example_2)
+```
+
+
+::: {.callout-note}
+
+Only broad peak results are shown in the following sections and in the Shiny app. However, all results, including narrow peak results, are available for download in @sec-downloads.
+
+:::
+
+## Peak annotations
+
+We used to different packages to annotate peaks: *annotatr* and *ChIPseeker*. Both packages use different approaches and different genomic features for annotation. In particular, *ChIPseeker* includes intergenic regions, while *annotatr* does not. Also, *ChIPseeker* removes redundant hits (peak spanning multiple features, e.g. promoter-exon-intron; parallel annotations from alternative transcripts), while *annotatr* provides all redundant hits, including all hits from all transcripts. To make results more comparable, *annotatr* results were reduced by using canonical transcripts only.
+
+Results of annotations for all peaks are shown in @fig-peak-annotations. A set of 100,000 randomly located peaks with widths randomly drawn from the original data was used for comparison. Both methods show similar trends, with most peaks located in intronic and intergenic regions. There are no obvious large-scale differences between conditions.
+
+```{r}
+#| label: fig-peak-annotations
+#| fig-cap: Peak annotations of top 30,000 peaks using (A) *annotatr* package, (B) *ChIPseeker* package and (C) *ChIPseeker* package with downstream and distal peaks removed, for broad peaks. The last bar shows annotations of 100,000 randomly located peaks with widths randomly drawn from the original data.
+#| fig-width: 8
+#| fig-height: 8
+pl1 <- tar_read(fig_groups_annotatr_narrow)
+pl2 <- tar_read(fig_groups_chipseeker_narrow)
+pl3 <- tar_read(fig_groups_chipseeker_red_narrow)
+plot_grid(pl1, pl2, pl3, nrow = 2, labels = c("A ", "B", "C"), rel_widths = c(1, 1.1)) 
+```
+
+*ChIPseeker* provided, among other annotations, distance to the nearest TSS. @fig-peaks-tss shows the distributions of these distances. 
+
+```{r}
+#| label: fig-peaks-tss
+#| fig-cap: Coverage of peaks around the TSS in four conditions, using all broad peaks.
+#| fig-width: 8
+#| fig-height: 3
+tar_read(fig_groups_tss_narrow) 
+```
+
+## Assigning genes to peaks
+
+For functional enrichment peaks need to be assigned to genes, which in turn, are annotated with functional terms, like GO, KEGG and Reactome. For this, *ChIPseeker* was used and a peak was deemed to be "belonging to a gene", when it was located in one of the following regions: Intron, Exon, Promoter (<=1kb), 3' UTR, 5' UTR. Locations farther away from the gene were discarded.
+
+
+
+
+
+
+
+# Differential binding analysis
+
+[Differential binding analysis](https://bioconductor.org/packages/release/bioc/vignettes/DiffBind/inst/doc/DiffBind.pdf) was performed using the *DiffBind* package. Both narrow and broad peaks were analysed. Here we present results for broad peaks only, while narrow peak results are available for download in @sec-downloads. Significantly changing peaks were defined as those with FDR < `r params$fdr_limit` and |log2(FC)| > `r params$logfc_limit`.
+
+## Library-size normalisation
+
+In this Section differential binding analysis for library-size normalisation are shown.
+
+### Model with two factors
+
+The design included two factors: time point (iPS vs PSM) and treatment (control vs SETDB1 siRNA). @fig-volcano-full-libs-broad shows the volcano plot, @fig-up-down-full-libs-broad shows the number of peaks going up and down between factors.
+
+```{r}
+#| label: fig-volcano-full-libs-broad
+#| fig-cap: Volcano plots for differential binding analysis. Black points indicate statistically significant peaks.
+#| fig-width: 8
+#| fig-height: 4
+tar_read(fig_volcano_full_libs_narrow)
+```
+
+```{r}
+#| label: fig-up-down-full-libs-broad
+#| fig-cap: Number of up- and down-regulated peaks for time point effect (iPS vs PSM) and treatment effect (control vs SETDB1 siRNA), using broad peaks.
+#| fig-width: 2.2
+#| fig-height: 4
+tar_read(fig_up_down_full_libs_narrow) 
+```
+
+#### Annotation of differentially binding peaks
+
+@fig-dec-chipseeker-full-libs-broad shows the results of *ChIPseeker* annotation of the differentially binding peaks.
+
+```{r}
+#| label: fig-dec-chipseeker-full-libs-broad
+#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. **A** Proporiton of annotations among all peaks. **B** Fisher's test results for each group."
+#| fig-width: 8
+#| fig-height: 4
+pl1 <- tar_read(fig_dec_chipseeker_full_libs_narrow) 
+pl2 <- tar_read(fig_test_dec_chipseeker_full_libs_narrow)
+plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
+```
+
+
+@fig-deg-biotype-full-libs-broad shows the distribution of gene biotypes, for differentially binding peaks in genes or their promoters. For comparison, @fig-all-biotype shows the distribution of biotypes for all genes. Please note that 
+
+```{r}
+#| label: fig-deg-biotype-full-libs-broad
+#| fig-cap: "*ChIPseeker* gene biotype of differentially abundant peaks, in genes and promoters, in each contrast."
+#| fig-width: 6
+#| fig-height: 4
+tar_read(fig_deg_biotype_full_libs_narrow) 
+```
+
+```{r}
+#| label: fig-all-biotype
+#| fig-cap: Distribution of gene biotypes for all genes.
+#| fig-width: 4
+#| fig-height: 4
+tar_read(fig_all_biotype)
+```
+
+
+#### Gene set enrichment
+
+`fgsea` R package was used for gene set enrichment analysis, using functional annotations from GO, KEGG and Reactome. A summary of statistically significant terms is shown in @tbl-gse-full-libs-broad.
+
+```{r}
+#| label: tbl-gse-full-libs-broad
+#| tbl-cap: Functional terms enriched (FDR < 0.05) in GSE for the model with two factors.
+tar_read(gse_tab_full_libs_narrow) |> 
+  select(`Term ID` = term_id, Name = term_name, Contrast = contrast, NES = nes, Size = size, `Top genes` = genes) |> 
+  arrange(NES) |> 
+  gt_table() |> 
+  fmt_number(
+    columns = vars(NES),
+    n_sigfig = 2
+  )
+```
+
+
+### Model with pair-wise contrasts
+
+The design included selected pairwise comparison between conditions.
+
+```{r}
+#| label: fig-volcano-groups-libs-broad
+#| fig-cap: Volcano plots for differential binding analysis using broad peaks, for pair-wise contrasts.
+#| fig-width: 8
+#| fig-height: 7
+tar_read(fig_volcano_groups_libs_narrow)
+```
+
+```{r}
+#| label: fig-up-down-groups-libs-broad
+#| fig-cap: Number of up- and down-regulated peaks for pairwise-contrasts.
+#| fig-width: 4
+#| fig-height: 4
+tar_read(fig_up_down_groups_libs_narrow) 
+```
+
+#### Annotation of differentially binding peaks
+
+@fig-dec-chipseeker-groups-libs-broad shows the proportion of *ChIPSeeker* annotations in each contrast, split between peaks going up and down. A Fisher's test on the proportion in each contrast/annotation against the pooled background was performed to asses the statistical significance of the observed changes (see @sec-annotation-enrichment-note). Panel **B** shows the results. Asterisks indicated groups significantly different from the pooled background. Another aspect of the same data is shown in @fig-dec-chipseeker-err-groups-libs-broad.
+
+```{r}
+#| label: fig-dec-chipseeker-groups-libs-broad
+#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. **A** Proporiton of annotations among all peaks. **B** Fisher's test results for each group. The colour shows the odds ratio, with red indicating an enrichment and blue indicating a depletion. The original odds ratio is always positive, here it is multiplied by -1 for depleted annotations. The asterisk indicates statistical significance."
+#| fig-width: 8
+#| fig-height: 4
+pl1 <- tar_read(fig_dec_chipseeker_groups_libs_narrow) 
+pl2 <- tar_read(fig_test_dec_chipseeker_groups_libs_narrow)
+plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
+```
+
+```{r}
+#| label: fig-dec-chipseeker-err-groups-libs-broad
+#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. 95% confidence intervals of a proportions are shown."
+#| fig-width: 8
+#| fig-height: 5
+tar_read(fig_dec_chipseeker_err_groups_libs_narrow) 
+```
+
+#### Note on enrichment test {#sec-annotation-enrichment-note}
+
+```{r}
+#| label: annot-test-data
+tst <- tar_read(tbl_annot_fisher_example)
+```
+
+@{fig-dec-chipseeker-groups-libs-broad}B shows annotation enrichment results. Here we explain how it was calculated. For a given annotation and a group/contrast a contingency table, like the one shown in @tbl-annot-fisher-example, is created. It counts the number of peaks annotated as "Promoter" vs number of peaks with other annotations, in the group/contrast "48h_Ctrl-iPS_Ctrl_up" against all other contrasts. It is a test of a proportion. The null hypothesis is that the proportion in the first row (`r tst[1, 2]` / `r tst[1, 3]`) is the same as the proportion in the second row (`r tst[2, 2]` / `r tst[2, 3]`). That is, that that the proportion of peaks annotated as "Promoter" does not depend on the choice of contrast. A Fisher's exact test was used to assess the significance.
+
+Please note that in some cases the counts in the top row (in a given contrast) are very small. This will result in a reduced sensitivity of the test and a lot of negative results (large p-values). This is particularly the case for contrast `48h_SETDB1-iPS_SETDB1_down`, where the peak counts are very small. Hence, lack of statistical significance does not mean lack of annotation enrichment.
+
+```{r}
+#| label: tbl-annot-fisher-example
+#| tbl-cap: Example of contingency table used in the annotation enrichment test. The annotation is "Promoter" and the contrast/group is 48h_Ctrl-iPS_Ctrl_up.
+tst |> 
+  gt()
+```
+
+
+#### Gene set enrichment
+
+```{r}
+#| label: tbl-gse-groups-libs-broad
+#| tbl-cap: Functional terms enriched (FDR < 0.05) in GSE for the model with pair-wise contrasts.
+tar_read(gse_tab_groups_libs_narrow) |> 
+  select(`Term ID` = term_id, Name = term_name, Contrast = contrast, NES = nes, Size = size, `Top genes` = genes) |> 
+  arrange(NES) |> 
+  gt_table() |> 
+  fmt_number(
+    columns = vars(NES),
+    n_sigfig = 2
+  )
+```
+
+
+
+
+# Peak examples
+
+```{r}
+#| label: fig-de-peak-example-1
+#| fig-cap: A differentially abundant peak in contrast 48h-iPS, using library size normalisation.
+#| fig-width: 8
+#| fig-height: 15
+# tar_read(fig_de_peak_example_1) 
+```
+
+
+```{r}
+#| label: fig-de-abu-example-1
+#| fig-cap: Total normalised count in the peak shown in @fig-de-peak-example-1
+#| fig-width: 4
+#| fig-height: 4
+# tar_read(fig_de_abu_example_1) 
+```
+
+
+# RepeatMasker
+
+*RepeatMasker* is a curated genome annotation resource that catalogues interspersed repeats and low-complexity sequences across reference genomes. It identifies and classifies repetitive elements by aligning genomic sequences to libraries of known repeat consensus sequences (primarily Repbase and Dfam), and reports their genomic locations together with hierarchical classifications consisting of a class (e.g. LINE, SINE, LTR), family (L1, L2), and element name. The RepeatMasker database, as distributed by UCSC, provides a comprehensive, genome-wide map of transposable elements and other repeats that is widely used for repeat annotation, masking, and downstream genomic analyses.
+
+In this Section we report results per *RepeatMasker* family, with class name included. E.g. a family L1 in class LINE is reported as LINE:L1.
+
+::: {.callout-warning}
+
+Peak counts in repetitive regions should be interpreted with caution. Because *bowtie2* was run with multi-mapping enabled (-k 10), reads originating from repetitive sequences cannot be uniquely assigned to a single genomic location. As a result, some peaks in repetitive regions may be artefactual (“ghost” peaks), formed by reads that actually originate elsewhere but map to identical sequences. Conversely, genuine targets in repetitive regions may be under-represented or missed entirely, since only the first 10 possible alignments were reported and additional valid mappings were discarded.
+:::
+
+## Peaks per RepeatMasker family sequence
+
+@fig-groups-rmsk-broad shows the proportions of MACS peaks mapping to a *RepeatMasker* sequences in each family. 
+
+```{r}
+#| label: fig-groups-rmsk-broad
+#| fig-cap: RepeatMasker categories in broad peaks for the top 30,000 MACS peaks, per condition.
+#| fig-width: 3.5
+#| fig-height: 4
+tar_read(fig_groups_rmsk_narrow)
+```
+
+@fig-dec-rmsk-broad shows the proportions of differentially bound peaks across *RepeatMasker* categories and their significance.
+
+```{r}
+#| label: fig-dec-rmsk-broad
+#| fig-cap: RepeatMasker categories in broad peaks for the differentially binding peaks using the pairwise model with library size normalisation.
+#| fig-width: 7
+#| fig-height: 4
+pl1 <- tar_read(fig_dec_rmsk_groups_libs_narrow)
+pl2 <- tar_read(fig_test_dec_rmsk_groups_libs_narrow) 
+plot_grid(pl1, pl2, nrow = 1)
+```
+
+
+
+## *RepeatMasker* family sequences containing MACS peaks
+
+@tbl-rmsk-stats shows the *RepeatMasker* families with the highest percentage of sequences containing MACS peaks (all consensus peaks were considered). Telomeric (telo) and centromeric (centr, acro) satellite repeats are strongly enriched in K9 peaks.
+
+A permutation test was performed to assess the statistical significance of the association. Both *RepeatMasker* sequences and MACS peaks were randomly distributed along all chromosomes and the overlap count was found. This was repeated 100 times (a rather small number of repeats due you time constraints - limiting the reported p-values to ~0.01). The mean overlap count, representing the expected count under the null hypothesis of no association between peaks and *RepeatMasker*, was found together with the corresponding p-value.   
+
+```{r}
+#| label: tbl-rmsk-stats
+#| tbl-cap: Percentage of *RepeatMasker* elements in a given family, containing at least one broad peak. RMF stands for *RepeatMasker* family. Only top 20 families are shown. The expected number of the RMF sequences containing a MACS peak and the corresponding p-values were calculated under the null hypothesis of the randomly distributed peaks and RM sequences, using a permutation test. Due to time constraints, tests with only 100 permutations were carried out, which resulted in the smallest possible p-value of 0.01. A p-value showing 0.019 constitutes an upper limit, so the actual p-values in these instances are likely smaller.
+tb <- tar_read(tbl_rmsk_stats) |>  
+  mutate(n_not_over = n_rmask - n_over)
+tot_rmask <- sum(tb$n_rmask)
+tot_over = sum(tb$n_over)
+tot_not_over = sum(tb$n_not_over)
+
+tb |> mutate(
+  or = (n_over / n_not_over) / ((tot_over - n_over) / (tot_not_over - n_not_over))
+) |>  
+  select(
+    `RepeatMasker family` = rep_fam,
+    `Median RMF sequence width` = median_width,
+    `Number of RMF sequences in database` = n_rmask,
+    `Number of RMF sequences with K9 peaks` = n_over,
+    `% RMF sequences with K9 peaks` = perc,
+    `Expected number of RMF seq with peaks from random` = perm_over,
+    `Odds ratio` = or,
+    `p-value` = p_value
+  ) |> 
+  head(20) |> 
+  gt() |> 
+  fmt_number(
+    columns = c(5, 6, 7, 8),
+    n_sigfig = 3
+  )
+```
+
+
+# Search for motifs
+
+There are hundreds of thousands of peaks detected in each condition (see @fig-peak-width). They cover a substantial portion of the genome, about 5-6% (see @fig-peak-coverage). Searching for motifs in hundreds of megabases of genome space would be futile - returning all possible motifs everywhere.
+
+Therefore, we decided to focus on differentially binding peaks only for this exercise. *DiffBind* peaks with $FDR < 0.01$ and $|\log_2 FC| > 1$ using pairwise comparison were selected. This limits the search space to 100-300 peaks per contrast. DNA sequences for these peaks were extracted from the human genome used for mapping.  
+
+`r targets::tar_read(n_tf_motifs)` CORE vertebrate motifs were downloaded from the [JASPAR 2024](https://jaspar.elixir.no/) database, containing manually curated high-quality and non-redundant DNA-binding profiles for transcription factors (TFs).
+
+R package [*universalmotif*](https://joss.theoj.org/papers/10.21105/joss.07012) was used to search these motifs in the peak sequences. Every DB peak considered was found to contain multiple motifs. In fact, there were typically 50-60 unique motifs found in each peak (@tbl-motif-stats) which increases to 60-80 for motifs found only in promoter regions (@tbl-motif-stats-promoters).
+
+```{r}
+#| label: tbl-motif-stats
+#| tbl-cap: Summary of motif search results in DB peaks.
+tar_read(motif_stats) |> 
+  gt() |> 
+  fmt_number(columns = `Motifs per peak`, n_sigfig = 3)
+```
+
+
+```{r}
+#| label: tbl-motif-stats-promoters
+#| tbl-cap: Summary for motif search in DB peaks, but for peaks in promoter regions only.
+tar_read(motif_stats_promoters) |> 
+  gt() |> 
+  fmt_number(columns = `Motifs per peak`, n_sigfig = 3)
+```
+
+# Resources
+
+## Interactive data explorers {#sec-explorers}
+
+- [Differential expression](https://shiny.compbio.dundee.ac.uk/mgierlinski/private/h3mecut/de)
+
+
+## Downloads {#sec-downloads}
+
+```{r}
+#| label: tbl-downloads
+#| tbl-cap: Annotated differential abundance results
+expand_grid(
+  norm = c("libs", "spike"),
+  type = c("broad", "narrow"),
+  model = c("full", "groups")
+) |> 
+  unite(name, c(model, norm, type), remove = FALSE) |>
+  mutate(link = str_glue("[link](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3mecut/tab/diffbind_chipseeker_{name}.csv)")) |> 
+  select(-name) |> 
+  mutate(
+    Normalisation = recode_values(norm, "libs" ~ "Library size", "spike" ~ "Spike-in"),
+    `Peak type` = recode_values(type, "broad" ~ "Broad", "narrow" ~ "Narrow"),
+    `DE model` = recode_values(model, "full" ~ "Two factors", "groups" ~ "Separate contrasts")
+  ) |> 
+  select(-c(norm, type, model)) |> 
+  relocate(link, .after = 4) |> 
+  gt() |> 
+  fmt_markdown(columns = link)
+```
+
+ - [Repeat Masker - consensus peaks mapping](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3mecut/tab/rmask_peaks.csv)
+
+## Code
+
+All analysis in this report has been done in R. The source code can be
+found on [GitHub](https://github.com/bartongroup/MG_H3meCut).
+
+
+
+# Session info {#sec-session-info}
+
+```{r}
+#| label: session-info
+#| cache: false
+targets::tar_load(session_info)
+```
+
+```{r}
+#| label: gt_session
+gt_session <- function(s) {
+  s |> 
+    gt::gt() |> 
+    gt::tab_options(
+      table.align = "left",
+      data_row.padding = gt::px(3)
+    ) |> 
+    gt::opt_table_font(
+      font = c(
+        #gt::google_font(name = "Roboto Mono"),
+        gt::default_fonts()
+      )
+    )
+}
+```
+
+
+## Cluster software {#sec-cluster-software}
+
+```{r}
+#| label: cluster-software
+tar_read(software_versions) |> 
+  select(Software = name, Version = version) |> 
+  gt_session() |> 
+  cols_width(
+    Software ~ px(150)
+  ) 
+```
+
+
+## Local platform
+
+```{r}
+#| label: session-info-platform
+#| cache: false
+session_info$platform |>
+  unlist() |>
+  tibble::as_tibble(rownames = "Setting") |> 
+  dplyr::rename(Value = value) |> 
+  gt_session() |> 
+  gt::cols_width(
+    Setting ~ gt::px(150)
+  )
+```
+
+## R packages {#sec-packages}
+
+```{r}
+#| label: session-info-packages
+#| cache: false
+session_info$packages |>
+  tibble::as_tibble() |>
+  dplyr::filter(attached == TRUE) |> 
+  dplyr::select(Package = package, Version = loadedversion, Date = date, Source = source) |> 
+  dplyr::mutate(
+    Source = stringr::str_remove(Source, "\\(.+$"),
+    Source = stringr::str_replace(Source, "Bioconduc~", "Bioconductor")
+  ) |> 
+  gt_session() |> 
+  gt::cols_width(
+    Package ~ gt::px(150),
+    Version ~ gt::px(80),
+    Date ~ gt::px(200)
+  )
+```

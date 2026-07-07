@@ -86,7 +86,7 @@ plot_peak_distribution_sample <- function(npeaks, smpl, chrom_sizes, bin_size = 
 # Normfac is a tibble with sample and norm columns
 plot_peak_distribution_chrom <- function(npeaks, chrom, meta, normfac = NULL, bin_size = 1, bar_size = 1.2) {  
   np <- npeaks |> 
-    filter(chr == chrom & str_detect(sample, "Me3")) |>
+    filter(chr == chrom) |>
     mutate(
       across(c(start, end), \(x) {x / 1e6}),
       mid = (start + end) / 2,

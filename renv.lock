@@ -277,6 +277,29 @@
       "Author": "Hervé Pagès [aut, cre]",
       "Maintainer": "Hervé Pagès <hpages.on.github@gmail.com>"
     },
+    "BSgenome.Hsapiens.UCSC.hg38": {
+      "Package": "BSgenome.Hsapiens.UCSC.hg38",
+      "Version": "1.4.5",
+      "Source": "Bioconductor",
+      "Title": "Full genomic sequences for Homo sapiens (UCSC genome hg38)",
+      "Description": "Full genomic sequences for Homo sapiens as provided by UCSC (genome hg38, based on assembly GRCh38.p14 since 2023/01/31). The sequences are stored in DNAString objects.",
+      "Author": "The Bioconductor Dev Team",
+      "Maintainer": "Bioconductor Package Maintainer <maintainer@bioconductor.org>",
+      "Depends": [
+        "R (>= 4.2.0)",
+        "GenomeInfoDb (>= 1.34.9)",
+        "BSgenome (>= 1.66.2)"
+      ],
+      "License": "Artistic-2.0",
+      "organism": "Homo sapiens",
+      "common_name": "Human",
+      "genome": "hg38",
+      "provider": "UCSC",
+      "release_date": "2023/01/31",
+      "source_url": "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/p14/",
+      "biocViews": "AnnotationData, Genetics, BSgenome, Homo_sapiens",
+      "NeedsCompilation": "no"
+    },
     "Biobase": {
       "Package": "Biobase",
       "Version": "2.72.0",

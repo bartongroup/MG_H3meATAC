@@ -171,7 +171,7 @@ targets_main <- function() {
   # This is done only for ChIPseeker, differential binding in pair-wise comparison significant genes,
   # lib-size normalisation, narrow peaks
   search_for_motifs <- tar_plan(
-    dec_for_motifs = dec_chipseeker_sig_groups_libs_narrow,
+    dec_for_motifs = dec_chipseeker_sig_groups_libs_narrow |> dplyr::filter(abs(log_fc) > 4),
 
     tar_target(genome_file, file.path(config$data_path, config$dir$genome, "Homo_sapiens.canonical.fa"), format = "file"),
     db_ranges = dec_for_motifs |> dplyr::distinct(peak_id, chr, start, end, strand),
@@ -179,6 +179,8 @@ targets_main <- function() {
     tf_motifs = get_jaspar_matrix(),
     n_tf_motifs = tf_motifs |> length(),
     tf_res = search_sequences_for_motifs(db_seqs, tf_motifs),
+    #tf_res = readr::read_rds("cache/tf_res.rds"),
+
     tf_res_sig = tf_res |> dplyr::filter(motif_fdr < 0.01),
     dec_res = dec_for_motifs |> dplyr::left_join(tf_res_sig |> dplyr::mutate(peak_id = as.character(peak_id)), by = "peak_id", relationship = "many-to-many"),
 
@@ -195,8 +197,7 @@ targets_main <- function() {
 
     consensus_peaks = db_libs_narrow |> extract_consensus(),
     tbl_rmsk_peaks =  annotate_peaks_rmsk(consensus_peaks, rmsk),
-    # Do it manually, cache:
-    tbl_rmsk_stats = rmsk_stats(rmsk, consensus_peaks, n_perm = 50, n_top = 20),
+    tbl_rmsk_stats = rmsk_stats(rmsk, consensus_peaks, n_perm = 100, n_top = 20),
     #tbl_rmsk_stats = readr::read_rds("cache/tbl_rmsk_stats.rds"),
 
     sav_rmsk_peaks = tbl_rmsk_peaks |> readr::write_csv("tab/rmask_peaks.csv"),
@@ -206,8 +207,10 @@ targets_main <- function() {
     db_none_narrow = no_normalization(db_libs_narrow),
     #fig_norm_compare = plot_all_total_bindings(db_none_narrow, db_libs_narrow, db_spike_narrow, metadata),
 
-    fig_de_abu_example_1 = plot_peak_bindings(dbc_full_libs_narrow, "5:70822898-70823402", metadata),
-    #fig_de_peak_example_1 = plot_region_ggbio_peak_id(dec_full_libs_narrow |> dplyr::filter(contrast == "48h-iPS"), "5:70822898-70823402", config, metadata, peaks_narrow, peaks_narrow, normfac |> dplyr::mutate(norm = libs_norm)),
+    fig_peak_example_1 = plot_region_ggbio("48h_Ctrl_2", config, metadata, make_region(7, 143620000, 143621600), peaks_broad = NULL, peaks_narrow = peaks_narrow),
+
+    # fig_de_abu_example_1 = plot_peak_bindings(dbc_full_libs_narrow, "5:70822898-70823402", metadata),
+    # fig_de_peak_example_1 = plot_region_ggbio_peak_id(dec_full_libs_narrow |> dplyr::filter(contrast == "48h-iPS"), "5:70822898-70823402", config, metadata, peaks_narrow, peaks_narrow, normfac |> dplyr::mutate(norm = libs_norm)),
 
     normfac = tibble::tibble(
       sample = db_libs_narrow$samples$SampleID,

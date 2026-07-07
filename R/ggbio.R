@@ -1,4 +1,4 @@
-plot_region_ggbio <- function(samples, config, meta, region, peaks_broad, peaks_narrow,
+plot_region_ggbio <- function(samples, config, meta, region, peaks_broad = NULL, peaks_narrow = NULL,
                                normfac = NULL, rel_scale = 5) {
   env <- new.env(parent = globalenv())
   
@@ -40,6 +40,9 @@ plot_region_ggbio <- function(samples, config, meta, region, peaks_broad, peaks_
   y1 <- y_min / 3
   y2 <- 2 * y1
 
+  if(is.null(peaks_broad)) peaks_broad <- tibble()
+  if(is.null(peaks_narrow)) peaks_narrow <- tibble()
+  
   peak_dat <- bind_rows(
     peaks_broad |> add_column(type = "broad", y = y1),
     peaks_narrow |> add_column(type = "narrow", y = y2)

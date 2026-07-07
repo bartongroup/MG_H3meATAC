@@ -1,4 +1,4 @@
 {
   "fdr_limit" : 0.01,
-  "logfc_limit" : 0.58
+  "logfc_limit" : 1
 }
