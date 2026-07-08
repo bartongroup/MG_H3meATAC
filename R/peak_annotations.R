@@ -282,6 +282,8 @@ search_sequences_for_motifs <- function(seq_tb, motifs) {
       motif_name = motif,
       match_seq = match,
       motif_score = score,
+      motif_min_score = min.score,
+      motif_max_score = max.score,
       motif_p_value = pvalue,
       motif_fdr = qvalue
     ) |> 

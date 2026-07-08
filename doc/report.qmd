@@ -555,13 +555,13 @@ plot_grid(pl1, pl2, nrow = 1)
 
 ## *RepeatMasker* family sequences containing MACS peaks
 
-@tbl-rmsk-stats shows the *RepeatMasker* families with the highest percentage of sequences containing MACS peaks (all consensus peaks were considered). Telomeric (telo) and centromeric (centr, acro) satellite repeats are strongly enriched in K9 peaks.
+@tbl-rmsk-stats shows the *RepeatMasker* families with the highest percentage of sequences containing MACS peaks (all consensus peaks were considered). 
 
 A permutation test was performed to assess the statistical significance of the association. Both *RepeatMasker* sequences and MACS peaks were randomly distributed along all chromosomes and the overlap count was found. This was repeated 100 times (a rather small number of repeats due you time constraints - limiting the reported p-values to ~0.01). The mean overlap count, representing the expected count under the null hypothesis of no association between peaks and *RepeatMasker*, was found together with the corresponding p-value.   
 
 ```{r}
 #| label: tbl-rmsk-stats
-#| tbl-cap: Percentage of *RepeatMasker* elements in a given family, containing at least one broad peak. RMF stands for *RepeatMasker* family. Only top 20 families are shown. The expected number of the RMF sequences containing a MACS peak and the corresponding p-values were calculated under the null hypothesis of the randomly distributed peaks and RM sequences, using a permutation test. Due to time constraints, tests with only 100 permutations were carried out, which resulted in the smallest possible p-value of 0.01. A p-value showing 0.019 constitutes an upper limit, so the actual p-values in these instances are likely smaller.
+#| tbl-cap: Percentage of *RepeatMasker* elements in a given family, containing at least one broad peak. RMF stands for *RepeatMasker* family. Only top 20 families are shown. The expected number of the RMF sequences containing a MACS peak and the corresponding p-values were calculated under the null hypothesis of the randomly distributed peaks and RM sequences, using a permutation test. Due to time constraints, tests with only 100 permutations were carried out, which resulted in the smallest possible p-value of 0.01. A p-value showing 0.01 constitutes an upper limit, so the actual p-values in these instances are likely smaller.
 tb <- tar_read(tbl_rmsk_stats) |>  
   mutate(n_not_over = n_rmask - n_over)
 tot_rmask <- sum(tb$n_rmask)
@@ -572,7 +572,7 @@ tb |> mutate(
   or = (n_over / n_not_over) / ((tot_over - n_over) / (tot_not_over - n_not_over))
 ) |>  
   select(
-    `RepeatMasker family` = rep_fam,
+    `RepeatMasker family` = group,
     `Median RMF sequence width` = median_width,
     `Number of RMF sequences in database` = n_rmask,
     `Number of RMF sequences with K9 peaks` = n_over,
@@ -592,13 +592,13 @@ tb |> mutate(
 
 # Search for motifs
 
-There are hundreds of thousands of peaks detected in each condition (see @fig-peak-width). They cover a substantial portion of the genome, about 5-6% (see @{fig-peak-count}B). Searching for motifs in hundreds of megabases of genome space would be futile - returning all possible motifs everywhere.
+There are hundreds of thousands of peaks detected in each condition (see @fig-peak-width). They cover a substantial portion of the genome, about 1% (see @{fig-peak-count}B). Searching for short motifs in tens of megabases of genome space would be futile - returning all possible motifs everywhere.
 
-Therefore, we decided to focus on differentially binding peaks only for this exercise. *DiffBind* peaks with $FDR < 0.01$ and $|\log_2 FC| > 1$ using pairwise comparison were selected. This limits the search space to 100-300 peaks per contrast. DNA sequences for these peaks were extracted from the human genome used for mapping.  
+Therefore, we decided to focus on strongly differentially binding peaks only for this exercise. *DiffBind* peaks with $FDR < 0.01$ and $|\log_2 FC| > 3$ using pairwise comparison were selected. This limits the search space to a few thousand peaks per contrast. DNA sequences for these peaks were extracted from the human genome used for mapping.  
 
 `r targets::tar_read(n_tf_motifs)` CORE vertebrate motifs were downloaded from the [JASPAR 2024](https://jaspar.elixir.no/) database, containing manually curated high-quality and non-redundant DNA-binding profiles for transcription factors (TFs).
 
-R package [*universalmotif*](https://joss.theoj.org/papers/10.21105/joss.07012) was used to search these motifs in the peak sequences. Every DB peak considered was found to contain multiple motifs. In fact, there were typically 50-60 unique motifs found in each peak (@tbl-motif-stats) which increases to 60-80 for motifs found only in promoter regions (@tbl-motif-stats-promoters).
+R package [*universalmotif*](https://joss.theoj.org/papers/10.21105/joss.07012) was used to search these motifs in the peak sequences. Every DB peak considered was found to contain multiple motifs. In fact, there were typically 30 unique motifs found in each peak, see @tbl-motif-stats and @tbl-motif-stats-promoters).
 
 ```{r}
 #| label: tbl-motif-stats

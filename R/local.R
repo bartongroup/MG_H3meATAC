@@ -217,6 +217,10 @@ get_motif_stats <- function(dec_res, dec_for_motifs) {
     inner_join(d4, by = "contrast")
 }
 
+get_top_motif_stats <- function(dec_res, n_top = 30) {
+  dec_res |> 
+    slice_max(order_by = motif_score, n = n_top)
+}
 
 
 tabulate_annotations <- function(an, group_var, annot_var, n_top = NULL, rand_an = NULL, order_annot = FALSE) {
