@@ -147,7 +147,8 @@ extract_bindings <- function(db, pids = NULL) {
     as_tibble() |> 
     mutate(peak_id = str_glue("{seqnames}:{start}-{end}"), .before = 1) |> 
     select(-c(seqnames, start, end, width, strand)) |> 
-    pivot_longer(-peak_id, names_to = "sample", values_to = "value")
+    pivot_longer(-peak_id, names_to = "sample", values_to = "value") |> 
+    mutate(sample = str_remove(sample, "^X")) # diffbind adding X before numbers
   if(!is.null(pids)) {
     d <- d |> 
       filter(peak_id %in% pids)

@@ -101,7 +101,8 @@ PAIRS = ["R1", "R2"]
 ENVIRONMENT = ["environment.txt", "spec-file.txt"]
 TRIM_COUNTS = expand("fastq_trimmed/{sample}_count.txt", sample = SAMPLES)
 CHRSTATS = expand("chrcount/{sample}.txt", sample = SAMPLES)
-QCS = expand("qc/{sample}_{pair}_fastqc.html", sample = SAMPLES, pair = PAIRS)
+QCS = expand("qc/{sample}_{pair}_001_fastqc.html", sample = SAMPLES, pair = PAIRS)
+QCST = expand("qc_trimmed/{sample}_{pair}_fastqc.html", sample = SAMPLES, pair = PAIRS)
 FSCREENS = expand("fscreen/{sample}_{pair}_screen.txt", sample = SAMPLES, pair = PAIRS)
 MULTIQC = ["multiqc/report.html"]
 CHRSTATS = expand("chrcount/{sample}.txt", sample = SAMPLES)
@@ -158,13 +159,23 @@ rule trim_adapters:
 # Quality control
 
 rule fastqc:
-    input: 'fastq_trimmed/{prefix}.fastq.gz'
+    input: 'fastq/{prefix}_001.fastq.gz'
     output:
-        html = 'qc/{prefix}_fastqc.html',
-        zip = 'qc/{prefix}_fastqc.zip'
+        html = 'qc/{prefix}_001_fastqc.html',
+        zip = 'qc/{prefix}_001_fastqc.zip'
     threads: 2
     shell:
         'fastqc -o qc --threads {threads} -f fastq {input}'
+
+rule fastqc_trimmed:
+    input: 'fastq_trimmed/{prefix}.fastq.gz'
+    output:
+        html = 'qc_trimmed/{prefix}_fastqc.html',
+        zip = 'qc_trimmed/{prefix}_fastqc.zip'
+    threads: 2
+    shell:
+        'fastqc -o qc_trimmed --threads {threads} -f fastq {input}'
+
 
 ####################################################################
 # Fastq Screen
@@ -191,10 +202,11 @@ rule multiqc:
     input:
         fscreen = FSCREENS,
         qc = QCS,
+        qct = QCST,
         trimmed = expand('fastq_trimmed/{sample}_report.html', sample = SAMPLES)
     output: 'multiqc/report.html'
     shell:
-        'multiqc -f --filename report --outdir multiqc fastq_trimmed qc fscreen'
+        'multiqc -f --filename report --outdir multiqc fastq_trimmed qc qc_trimmed fscreen'
 
 ####################################################################
 # Count reads

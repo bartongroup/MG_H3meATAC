@@ -62,6 +62,7 @@ targets_main <- function() {
       fig_npeaks = plot_number_of_peaks(peaks, metadata),
       fig_peak_width = plot_peak_width_distribution(peaks),
       fig_peak_coverage = plot_peak_coverage(peaks, chrom_sizes, metadata),
+      median_width = median(peaks$end - peaks$start + 1),
 
       # Annotate all peaks
       peaks_annotatr_raw = annotate_peaks_annotatr(peaks, annotations),
@@ -171,7 +172,7 @@ targets_main <- function() {
   # This is done only for ChIPseeker, differential binding in pair-wise comparison significant genes,
   # lib-size normalisation, narrow peaks
   search_for_motifs <- tar_plan(
-    dec_for_motifs = dec_chipseeker_sig_groups_libs_narrow |> dplyr::filter(abs(log_fc) > 4),
+    dec_for_motifs = dec_chipseeker_sig_groups_libs_narrow |> dplyr::filter(abs(log_fc) > 3),
 
     tar_target(genome_file, file.path(config$data_path, config$dir$genome, "Homo_sapiens.canonical.fa"), format = "file"),
     db_ranges = dec_for_motifs |> dplyr::distinct(peak_id, chr, start, end, strand),
@@ -197,7 +198,7 @@ targets_main <- function() {
 
     consensus_peaks = db_libs_narrow |> extract_consensus(),
     tbl_rmsk_peaks =  annotate_peaks_rmsk(consensus_peaks, rmsk),
-    tbl_rmsk_stats = rmsk_stats(rmsk, consensus_peaks, n_perm = 100, n_top = 20),
+    tbl_rmsk_stats = rmsk_stats(rmsk, consensus_peaks, group_var = "rep_fam", n_perm = 100, n_top = 20),
     #tbl_rmsk_stats = readr::read_rds("cache/tbl_rmsk_stats.rds"),
 
     sav_rmsk_peaks = tbl_rmsk_peaks |> readr::write_csv("tab/rmask_peaks.csv"),
@@ -207,10 +208,10 @@ targets_main <- function() {
     db_none_narrow = no_normalization(db_libs_narrow),
     #fig_norm_compare = plot_all_total_bindings(db_none_narrow, db_libs_narrow, db_spike_narrow, metadata),
 
-    fig_peak_example_1 = plot_region_ggbio("48h_Ctrl_2", config, metadata, make_region(7, 143620000, 143621600), peaks_broad = NULL, peaks_narrow = peaks_narrow),
-
-    # fig_de_abu_example_1 = plot_peak_bindings(dbc_full_libs_narrow, "5:70822898-70823402", metadata),
-    # fig_de_peak_example_1 = plot_region_ggbio_peak_id(dec_full_libs_narrow |> dplyr::filter(contrast == "48h-iPS"), "5:70822898-70823402", config, metadata, peaks_narrow, peaks_narrow, normfac |> dplyr::mutate(norm = libs_norm)),
+    fig_peak_example_1 = plot_region_ggbio(metadata$sample, config, metadata, make_region(7, 143620700, 143621600), peaks_broad = NULL, peaks_narrow = peaks_narrow),
+    fig_de_abu_example_1 = plot_peak_bindings(dbc_groups_libs_narrow, "8:37374556-37375887", metadata),
+    dec_ctr = dec_groups_libs_narrow |> dplyr::filter(contrast == "48h_Ctrl-iPS_Ctrl"),
+    fig_de_peak_example_1 = plot_region_ggbio_peak_id(dec_ctr, "8:37374556-37375887", config, metadata, peaks_narrow = peaks_narrow, normfac = normfac |> dplyr::mutate(norm = libs_norm)),
 
     normfac = tibble::tibble(
       sample = db_libs_narrow$samples$SampleID,
@@ -221,7 +222,10 @@ targets_main <- function() {
     png_peaks_narrow_ctrl = plot_peak_distribution_sample(peaks_narrow, "iPS_Ctrl_1", chrom_sizes, bar_size = 1) |> gs("peaks_narrow_dist_ctrl", width = 8, height = 8),
     png_peaks_narrow_set = plot_peak_distribution_sample(peaks_narrow, "iPS_SET_1", chrom_sizes, bar_size = 1) |> gs("peaks_narrow_dist_set", width = 8, height = 8),
     png_peaks_narrow_48 = plot_peak_distribution_sample(peaks_narrow, "48h_SET_1", chrom_sizes, bar_size = 1) |> gs("peaks_narrow_dist_48", width = 8, height = 8),
-    png_peaks_narrow_11 = plot_peak_distribution_chrom(peaks_narrow, "11", metadata) |> gs("peaks_narrow_11", width = 8, height = 8)
+    png_peaks_narrow_11 = plot_peak_distribution_chrom(peaks_narrow, "11", metadata) |> gs("peaks_narrow_11", width = 8, height = 8),
+
+    sav_bed_consensus = write_bed(consensus_peaks, "tab/consensus_peaks.bed"),
+    sav_bed_de = write_bed(dec_groups_libs_narrow, "tab/de_peaks.bed", extra_cols = c("contrast_direction", "log_fc"))
   )
 
   for_manuscript <- tar_plan(

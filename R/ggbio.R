@@ -71,7 +71,8 @@ plot_region_ggbio <- function(samples, config, meta, region, peaks_broad = NULL,
 }
 
 
-plot_region_ggbio_peak_id <- function(dec, peakid, config, meta, peaks_broad, peaks_narrow, normfac = NULL, f = 2) {
+plot_region_ggbio_peak_id <- function(dec, peakid, config, meta, peaks_broad = NULL,
+                                      peaks_narrow = NULL, normfac = NULL, f = 2) {
   if(is.numeric(peakid)) {
     peakid <- dec$peak_id[peakid]
   }
@@ -88,7 +89,7 @@ plot_region_ggbio_peak_id <- function(dec, peakid, config, meta, peaks_broad, pe
   region <- make_region(pk$chr, pk$start, pk$end) |> 
     expand_region(f = f)
 
-  plot_region_ggbio(samples, config, meta, region, peaks_broad, peaks_narrow, normfac)
+  plot_region_ggbio(samples, config, meta, region, peaks_broad = peaks_broad, peaks_narrow = peaks_narrow, normfac = normfac)
 }
 
 

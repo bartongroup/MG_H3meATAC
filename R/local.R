@@ -21,6 +21,12 @@ write_dec <- function(dec, name) {
     write_csv(fname)
 }
 
+write_bed <- function(pks, fname, extra_cols = NULL) {
+  pks |> 
+    mutate(chr = paste0("chr", chr)) |>
+    select(chr, start, end, all_of(extra_cols)) |> 
+    write_tsv(fname, col_names = FALSE)
+}
 
 
 make_gr_regions <- function(df, chromosomes = c(1:22, "X", "Y")) {
@@ -47,24 +53,26 @@ num_overlaps_once <- function(A, B) {
   regioneR::numOverlaps(A, B, count.once = TRUE)
 }
 
-rmsk_stats <- function(rmsk, pks, n_perm = 100, n_top = 20) {
+rmsk_stats <- function(rmsk, pks, group_var = "rep_fam", n_perm = 100, n_top = 20) {
   # This is used implicitly by regioneR::randomizeRegions()
   if (!requireNamespace("BSgenome.Hsapiens.UCSC.hg38", quietly = TRUE)) {
     stop("Package BSgenome.Hsapiens.UCSC.hg38 is required for rmsk_stats().")
   }
   gr_pk <- make_gr_regions(pks)
+  rmsk <- rmsk |> 
+    mutate(grp = get(group_var))
 
-  fams <- rmsk$rep_fam |> 
+  groups <- rmsk$grp |> 
     unique()
 
-  rc <- map(fams, function(fm) {
+  rc <- map(groups, function(group) {
     gr_rm <- rmsk |> 
-      filter(rep_fam == fm) |> 
+      filter(grp == group) |> 
       make_gr_regions()
     ov <- IRanges::countOverlaps(gr_rm, gr_pk)
     n_over <- sum(ov > 0)
     tibble(
-      rep_fam = fm,
+      group = group,
       n_rmask = length(gr_rm),
       n_over = n_over,
       perc = 100 * n_over / length(gr_rm),
@@ -77,10 +85,10 @@ rmsk_stats <- function(rmsk, pks, n_perm = 100, n_top = 20) {
   perm <- map(1:n_top, function(i) {
     r <- rc[i, ]
     gr_rm <- rmsk |> 
-      filter(rep_fam == r$rep_fam) |> 
+      filter(grp == r$group) |> 
       make_gr_regions()
 
-    print(paste("Permutation for", r$rep_fam))
+    print(paste("Permutation for", r$group))
     pt <- regioneR::permTest(
       A = gr_rm,
       B = gr_pk,
@@ -96,7 +104,7 @@ rmsk_stats <- function(rmsk, pks, n_perm = 100, n_top = 20) {
       suppressWarnings()
 
     tibble(
-      rep_fam = r$rep_fam,
+      group = r$group,
       p_value = pt$num_overlaps_once$pval,
       perm_over = pt$num_overlaps_once$permuted |> mean()
     )
@@ -104,7 +112,7 @@ rmsk_stats <- function(rmsk, pks, n_perm = 100, n_top = 20) {
     list_rbind()
 
   rc |> 
-    left_join(perm, by = join_by(rep_fam))
+    left_join(perm, by = join_by(group))
 }
 
 
@@ -184,7 +192,7 @@ plot_peak_coverage <- function(peaks, chrom_sizes, meta, annot = NULL) {
       geom_col() +
       scale_fill_manual(values = okabe_ito_palette) +
       scale_y_continuous(expand = expansion(mult = c(0, 0.3))) +
-      labs(x = "Sample", y = "Genome coverage by peaks (%)")
+      labs(x = NULL, y = "Genome coverage by peaks (%)")
   })
 }
 
