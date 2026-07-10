@@ -63,6 +63,12 @@ gt_table <- function(s) {
       )
     )
 }
+
+sci <- function(x, digits = 1) {
+  z <- strsplit(sprintf(paste0("%.", digits, "e"), x), "e", fixed = TRUE)[[1]]
+  paste0(z[1], " \\times 10^{", as.integer(z[2]), "}")
+}
+
 ```
 
 # Proposal
@@ -652,6 +658,78 @@ tar_read(tf_enr) |>
   pivot_wider(id_cols = motif_name, names_from = contrast_direction, values_from = cons, values_fill = "-") |> 
   rename(Motif = motif_name) |> 
   gt()
+```
+
+
+# Comparison to CUT&Tag experiment
+
+```{r}
+#| label: load-cut-comparison
+tar_load(cmp_cut_atac)
+```
+
+A comparison of CUT&Tag and ATAC-seq peaks changing upon differentiation was carried out. The *DiffBind* results for broad peaks (CUT&Tag) were compared to narrow peaks from ATAC-seq. The following directional contrasts of CUT&Tag were considered:
+
+ - 48h_Ctrl-iPS_Ctrl_down
+ - 48h_Ctrl-iPS_Ctrl_up
+ - 48h_SETDB1-iPS_SETDB1_down
+ - 48h_SETDB1-iPS_SETDB1_up
+
+For each contrast significant (FDR < 0.01 and |log2 FC| > 0.58) were selected, as described in the [CUT&Tag report](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3mecut/doc/report.html#model-with-pair-wise-contrasts). These are peaks that gain (up) or lose (down) H3K9me3 upon differentiation. These were compared with all direction contrasts in ATAC-sec data.
+
+The comparison we based on enrichment using Fisher's test. Let's take `48h_Ctrl-iPS_Ctrl_up` in CUT&Tag and `48h_Ctrl-iPS_Ctrl_down` in ATAC-seq as an example. That is, we ask a question: do peaks gaining H3K9me3 upon differentiation lose chromatin access upon differetiaion? All statistically significant peaks in `48h_Ctrl-iPS_Ctrl_up` in CUT&Tag (peaks gaining H3K9me3 upon differentiation) were used. An overlap with all ATAC-seq peaks in the `48h_Ctrl-iPS_Ctrl_down` contrast, significant and not, was caluclated. The contingency table for overlap/significance comparison is shown in @tbl-atac-cut-contingency-up-down.
+
+```{r}
+#| label: tbl-atac-cut-contingency-up-down
+#| tbl-cap: Contingency table for `48h_Ctrl-iPS_Ctrl_up` in CUT&Tag and `48h_Ctrl-iPS_Ctrl_down` in ATAC-seq.
+r1 <- cmp_cut_atac |> 
+  filter(cut_contrast == "48h_Ctrl-iPS_Ctrl_up" & atac_contrast == "48h_Ctrl-iPS_Ctrl_down")
+x1 <- r1 |> 
+  pull(x) |> 
+  pluck(1)
+colnames(x1) <- c("ATAC Overlapping with CUT", "ATAC Not Overlapping with CUT")
+rownames(x1) <- c("ATAC significant", "ATAC not significant")
+x1 |> 
+  as_tibble(rownames = ".") |> 
+  gt()
+```
+
+The proportion of ATAC significant peaks among those overlapping with CUT&Tag (left column) is `r x1[1, 1]` / (`r x1[1, 1]` + `r x1[2, 1]`) = `r r1$cutover_prop |> signif(3)`. The corresponding proportion among ATAC peaks not overlapping with CUT&Tag is `r x1[1, 2]` / (`r x1[1, 2]` + `r x1[2, 2] |> as.integer()`) = `r r1$ncutover_prop |> signif(3)`. There is no statistically significant difference between these proportions, with FDR = `r r1$fdr |> signif(2)`.
+
+Now, let us compare `48h_Ctrl-iPS_Ctrl_up` in both data sets. The question asked is do peaks gaining H3K9me3 upon differentiation *gain* chromatin access upon differetiaion?
+
+```{r}
+#| label: tbl-atac-cut-contingency-up-up
+#| tbl-cap: Contingency table for `48h_Ctrl-iPS_Ctrl_up` in CUT&Tag and `48h_Ctrl-iPS_Ctrl_up` in ATAC-seq.
+r2 <- cmp_cut_atac |> 
+  filter(cut_contrast == "48h_Ctrl-iPS_Ctrl_up" & atac_contrast == "48h_Ctrl-iPS_Ctrl_up")
+x2 <- r2 |> 
+  pull(x) |> 
+  pluck(1)
+colnames(x2) <- c("ATAC Overlapping with CUT", "ATAC Not Overlapping with CUT")
+rownames(x2) <- c("ATAC significant", "ATAC not significant")
+x2 |> 
+  as_tibble(rownames = ".") |> 
+  gt()
+```
+
+The proportion of ATAC significant peaks among those overlapping with CUT&Tag (left column) is `r x2[1, 1]` / (`r x2[1, 1]` + `r x2[2, 1]`) = `r r2$cutover_prop |> signif(3)`. The corresponding proportion among ATAC peaks not overlapping with CUT&Tag is `r x2[1, 2]` / (`r x2[1, 2]` + `r x2[2, 2] |> as.integer()`) = `r r2$ncutover_prop |> signif(3)`. There is strong enrichment in the ATAC significant peaks among those overlapping with CUT&Tag, with FDR = $`r sci(r2$fdr, 1)`$. This means there is a very strong correlation between peaks gaining H3K9me3 and gaining accesibility upon differentiation. This is opposite to what was expected.
+
+```{r}
+#| label: tbl-atac-cut-compare-all
+#| tbl-cap: All significant (FDR < 0.01) results from CUT&Tag/ATAC-seq comparison.
+cmp_cut_atac |> 
+  filter(fdr < 0.01) |> 
+  select(CUT = cut_contrast, ATAC = atac_contrast, OR = odds_ratio, FDR = fdr) |> 
+  gt() |> 
+  fmt_number(
+    columns = c(OR),
+    n_sigfig = 2
+  ) |> 
+  fmt_scientific(
+    columns = c(FDR),
+    n_sigfig = 2
+  )
 ```
 
 # Resources

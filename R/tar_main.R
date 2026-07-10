@@ -200,6 +200,7 @@ targets_main <- function() {
   cuttag_comparison <- tar_plan(
     dec_cut = readr::read_rds("cache/dec_cut.rds") |> dplyr::mutate(sig = fdr < 0.01 & abs(log_fc) > 0.58),
     dec_atac = dec_groups_libs_narrow |> dplyr::mutate(sig = fdr < 0.01 & abs(log_fc) > 1),
+    cmp_cut_atac = compare_atac_cut(dec_cut, dec_atac)
   )
  
 
