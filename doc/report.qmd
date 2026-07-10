@@ -720,6 +720,7 @@ The proportion of ATAC significant peaks among those overlapping with CUT&Tag (l
 #| tbl-cap: All significant (FDR < 0.01) results from CUT&Tag/ATAC-seq comparison.
 cmp_cut_atac |> 
   filter(fdr < 0.01) |> 
+  arrange(fdr) |> 
   select(CUT = cut_contrast, ATAC = atac_contrast, OR = odds_ratio, FDR = fdr) |> 
   gt() |> 
   fmt_number(
