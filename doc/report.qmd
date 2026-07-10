@@ -466,7 +466,7 @@ tar_read(fig_up_down_groups_libs_narrow)
 
 ```{r}
 #| label: fig-dec-chipseeker-groups-libs-broad
-#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. **A** Proporiton of annotations among all peaks. **B** Fisher's test results for each group. The colour shows the odds ratio, with red indicating an enrichment and blue indicating a depletion. The original odds ratio is always positive, here it is multiplied by -1 for depleted annotations. The asterisk indicates statistical significance."
+#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. **A** Proporiton of annotations among all peaks. **B** Fisher's test results for each group. The colour shows the odds ratio, with red indicating an enrichment and blue indicating a depletion. The original odds ratio is always positive, here it is multiplied by -1 for depleted annotations. The asterisk indicates statistical significance. Background contains peaks with FDR > 0.01 and |logFC| <= 1."
 #| fig-width: 8
 #| fig-height: 4
 pl1 <- tar_read(fig_dec_chipseeker_groups_libs_narrow) 
@@ -590,15 +590,17 @@ tb |> mutate(
 ```
 
 
-# Search for motifs
+# Motif analysis
 
 There are hundreds of thousands of peaks detected in each condition (see @fig-peak-width). They cover a substantial portion of the genome, about 1% (see @{fig-peak-count}B). Searching for short motifs in tens of megabases of genome space would be futile - returning all possible motifs everywhere.
 
-Therefore, we decided to focus on strongly differentially binding peaks only for this exercise. *DiffBind* peaks with $FDR < 0.01$ and $|\log_2 FC| > 3$ using pairwise comparison were selected. This limits the search space to a few thousand peaks per contrast. DNA sequences for these peaks were extracted from the human genome used for mapping.  
+Therefore, we decided to focus on strongly differentially binding peaks only for this exercise. *DiffBind* peaks with $FDR < 0.01$ and $|\log_2 FC| > 3$ using pairwise comparison were selected. This limits the search space to a few thousand peaks per contrast. DNA sequences for these peaks were extracted from the human genome used for mapping.
+
+## Search for all motifs
 
 `r targets::tar_read(n_tf_motifs)` CORE vertebrate motifs were downloaded from the [JASPAR 2024](https://jaspar.elixir.no/) database, containing manually curated high-quality and non-redundant DNA-binding profiles for transcription factors (TFs).
 
-R package [*universalmotif*](https://joss.theoj.org/papers/10.21105/joss.07012) was used to search these motifs in the peak sequences. Every DB peak considered was found to contain multiple motifs. In fact, there were typically 30 unique motifs found in each peak, see @tbl-motif-stats and @tbl-motif-stats-promoters).
+R package [*universalmotif*](https://joss.theoj.org/papers/10.21105/joss.07012) was used to search these motifs in the peak sequences using the function `scan_sequences()`. Every DB peak considered was found to contain multiple motifs. In fact, there were typically 30 unique motifs found in each peak, see @tbl-motif-stats and @tbl-motif-stats-promoters).
 
 ```{r}
 #| label: tbl-motif-stats
@@ -608,13 +610,48 @@ tar_read(motif_stats) |>
   fmt_number(columns = `Motifs per peak`, n_sigfig = 3)
 ```
 
-
 ```{r}
 #| label: tbl-motif-stats-promoters
 #| tbl-cap: Summary for motif search in DB peaks, but for peaks in promoter regions only.
 tar_read(motif_stats_promoters) |> 
   gt() |> 
   fmt_number(columns = `Motifs per peak`, n_sigfig = 3)
+```
+
+## Motif enrichment
+
+Short motifs are bound to appear everywhere and a list of all motifs in all peaks by itself is not informative. The next step involved motif enrichemnt. The function `enrich_motifs()` was used. It performs a Fisher's enrichment test for each motif, by comparing counts of the motif in the selection of peaks (significantly differentially bound) agains a background.
+
+The background for the enrichment was selected carefully. A random selection of DNA fragments from the entire genome would not be specific enough to tell the difference between the peaks that are chaning between the conditions versus those that do not change. Therefore, a backgound was selected from non-differentially bound peaks, by matching the distribution of length and GC content in 10 bins each. Specifically, consensus peaks across all conditions (present in at least 2 replicates) were used as the "universe". The GC content and the peak width of all changing peaks and the universe were divided into 10 bins each - 100 bind in total. The changing peaks were counted in each bin and the background was randomly selected from the universe (without the changing peaks) matching the number of peaks in each bin.
+
+:::{.callout-note}
+
+Motifs are not independent, as they form functionally similar groups, or multiple genes share the same motif. Therefore, the simple multiple test corrections (q-values) are not accurate. 
+
+:::
+
+```{r}
+#| label: tbl-motif-enrichment
+#| tbl-cap: Motif enrichment results for DB peaks with $FDR < 0.01$ and $|\log_2 FC| > 3$, in each contrast separately. Only motifs with q-value < 0.01 are shown.
+tar_read(tf_enr) |> 
+  group_by(contrast_direction) |> 
+  arrange(desc(target_enrichment)) |> 
+  select(Motif = motif_name, Consensus = motif_consensus, Enrichment = target_enrichment) |> 
+  gt() |> 
+  fmt_number(columns = Enrichment, n_sigfig = 3)
+```
+
+
+```{r}
+#| label: tbl-motif-summary
+#| tbl-cap: Summary of motif sequences from @tbl-motif-enrichment arrange for easy comparison between contrasts.
+tar_read(tf_enr) |>
+  group_by(motif_name, contrast_direction) |>
+  summarise(cons = str_c(motif_consensus, collapse = ",")) |>
+  ungroup() |> 
+  pivot_wider(id_cols = motif_name, names_from = contrast_direction, values_from = cons, values_fill = "-") |> 
+  rename(Motif = motif_name) |> 
+  gt()
 ```
 
 # Resources

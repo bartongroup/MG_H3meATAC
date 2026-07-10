@@ -18,7 +18,8 @@ targets_main <- function() {
     tar_target(params_file, "params.json", format = "file"),
     params = jsonlite::read_json(params_file),
     tar_target(meta_file, config$metadata_file, format = "file"),
-    metadata = read_metadata(meta_file)
+    metadata = read_metadata(meta_file),
+    tar_target(genome_file, file.path(config$data_path, config$dir$genome, "Homo_sapiens.canonical.fa"), format = "file"),
   )
 
   qc <- tar_plan(
@@ -139,16 +140,19 @@ targets_main <- function() {
         dec_rmsk = annotate_peaks_rmsk(dec, rmsk),
 
         dec_annotatr_sig = dec_annotatr |> dplyr::filter(fdr < params$fdr_limit & abs(log_fc) > params$logfc_limit),
+        dec_annotatr_nsig = dec_annotatr |> dplyr::filter(fdr >= params$fdr_limit & abs(log_fc) <= params$logfc_limit),
         dec_chipseeker_sig = dec_chipseeker |> dplyr::filter(fdr < params$fdr_limit & abs(log_fc) > params$logfc_limit),
+        dec_chipseeker_nsig = dec_chipseeker |> dplyr::filter(fdr >= params$fdr_limit & abs(log_fc) <= params$logfc_limit),
         dec_rmsk_sig = dec_rmsk |> dplyr::filter(fdr < params$fdr_limit & abs(log_fc) > params$logfc_limit),
+        dec_rmsk_nsig = dec_rmsk |> dplyr::filter(fdr >= params$fdr_limit & abs(log_fc) <= params$logfc_limit),
 
-        fig_dec_annotatr = plot_group_peak_annotations(dec_annotatr_sig, group_var = "contrast_direction", palette = 2, n_top = NULL),
-        fig_dec_chipseeker = plot_group_peak_annotations(dec_chipseeker_sig, group_var = "contrast_direction", n_top = NULL),
-        fig_dec_chipseeker_err = plot_group_peak_annotations(dec_chipseeker_sig, group_var = "contrast_direction", n_top = NULL, stacked = FALSE),
+        fig_dec_annotatr = plot_group_peak_annotations(dec_annotatr_sig, rand_an = dec_annotatr_nsig, group_var = "contrast_direction", palette = 2, n_top = NULL),
+        fig_dec_chipseeker = plot_group_peak_annotations(dec_chipseeker_sig, rand_an = dec_chipseeker_nsig, group_var = "contrast_direction", n_top = NULL),
+        fig_dec_chipseeker_err = plot_group_peak_annotations(dec_chipseeker_sig, rand_an = dec_chipseeker_nsig, group_var = "contrast_direction", n_top = NULL, stacked = FALSE),
         fig_dec_rmsk_da = plot_peak_rmsk(dec_rmsk_sig, fdr_limit = params$fdr_limit),
         fig_dec_rmsk_all = plot_peak_rmsk(dec_rmsk),
 
-        fig_dec_rmsk = plot_group_peak_annotations(dec_rmsk_sig, group_var = "contrast_direction", annot_var = "rep_category", n_top = NULL, palette = 3),
+        fig_dec_rmsk = plot_group_peak_annotations(dec_rmsk_sig, rand_an = dec_rmsk_nsig, group_var = "contrast_direction", annot_var = "rep_category", n_top = NULL, palette = 3),
 
         # Test statistical sigificance of proportion results
         tab_dec_chipseeker = tabulate_annotations(dec_chipseeker_sig, group_var = "contrast_direction", annot_var = "annotation"),
@@ -171,32 +175,37 @@ targets_main <- function() {
 
   # This is done only for ChIPseeker, differential binding in pair-wise comparison significant genes,
   # lib-size normalisation, narrow peaks
-  search_for_motifs <- tar_plan(
+  motif_analysis <- tar_plan(
     dec_for_motifs = dec_chipseeker_sig_groups_libs_narrow |> dplyr::filter(abs(log_fc) > 3),
+    n_peaks_for_motifs = nrow(dec_for_motifs),
+    consensus_peaks =  extract_consensus(db_libs_narrow),
+    consensus_seqs = fetch_range_sequences(genome_file, consensus_peaks),
 
-    tar_target(genome_file, file.path(config$data_path, config$dir$genome, "Homo_sapiens.canonical.fa"), format = "file"),
-    db_ranges = dec_for_motifs |> dplyr::distinct(peak_id, chr, start, end, strand),
-    db_seqs = fetch_range_sequences(genome_file, db_ranges),
     tf_motifs = get_jaspar_matrix(),
     n_tf_motifs = tf_motifs |> length(),
-    tf_res = search_sequences_for_motifs(db_seqs, tf_motifs),
-    #tf_res = readr::read_rds("cache/tf_res.rds"),
 
-    tf_res_sig = tf_res |> dplyr::filter(motif_fdr < 0.01),
-    dec_res = dec_for_motifs |> dplyr::left_join(tf_res_sig |> dplyr::mutate(peak_id = as.character(peak_id)), by = "peak_id", relationship = "many-to-many"),
+    # Scan for motifs to find locations
+    tf_scan = search_peaks_for_motifs(dec_for_motifs, tf_motifs, genome_file),
+    tf_scan_sig = tf_scan |> dplyr::filter(motif_fdr < 0.01),
+    dec_tf_scan = dec_for_motifs |> dplyr::left_join(tf_scan_sig |> dplyr::mutate(peak_id = as.character(peak_id)), by = "peak_id", relationship = "many-to-many"),
+    motif_stats = get_motif_stats(dec_tf_scan, dec_for_motifs),
+    motif_stats_promoters = get_motif_stats(dec_tf_scan |> dplyr::filter(annotation == "Promoter"), dec_for_motifs |> dplyr::filter(annotation == "Promoter")),
 
-    motif_stats = get_motif_stats(dec_res, dec_for_motifs),
-    motif_stats_promoters = get_motif_stats(dec_res |> dplyr::filter(annotation == "Promoter"), dec_for_motifs |> dplyr::filter(annotation == "Promoter"))
+    # Motif enrichment
+    tf_enr = motif_enrichment(dec_for_motifs, consensus_seqs, genome_file, tf_motifs),
+    tf_comb = dplyr::left_join(tf_enr, dec_tf_scan,  by = dplyr::join_by(motif_name, motif_id, contrast_direction), relationship = "many-to-many")
   )
 
 
-
+  cuttag_comparison <- tar_plan(
+    dec_cut = readr::read_rds("cache/dec_cut.rds") |> dplyr::mutate(sig = fdr < 0.01 & abs(log_fc) > 0.58),
+    dec_atac = dec_groups_libs_narrow |> dplyr::mutate(sig = fdr < 0.01 & abs(log_fc) > 1),
+  )
  
 
   for_report <- tar_plan(
     fig_all_biotype = plot_all_genes_biotype(),
 
-    consensus_peaks = db_libs_narrow |> extract_consensus(),
     tbl_rmsk_peaks =  annotate_peaks_rmsk(consensus_peaks, rmsk),
     tbl_rmsk_stats = rmsk_stats(rmsk, consensus_peaks, group_var = "rep_fam", n_perm = 100, n_top = 20),
     #tbl_rmsk_stats = readr::read_rds("cache/tbl_rmsk_stats.rds"),
@@ -267,7 +276,8 @@ targets_main <- function() {
     read_data,
     map_peaks,
     map_diffbind,
-    search_for_motifs,
+    motif_analysis,
+    cuttag_comparison,
     for_report
     #for_manuscript,
     #for_shiny

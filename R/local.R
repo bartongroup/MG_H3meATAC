@@ -69,7 +69,7 @@ rmsk_stats <- function(rmsk, pks, group_var = "rep_fam", n_perm = 100, n_top = 2
     gr_rm <- rmsk |> 
       filter(grp == group) |> 
       make_gr_regions()
-    ov <- IRanges::countOverlaps(gr_rm, gr_pk)
+    ov <- GenomicRanges::countOverlaps(gr_rm, gr_pk)
     n_over <- sum(ov > 0)
     tibble(
       group = group,
@@ -198,23 +198,23 @@ plot_peak_coverage <- function(peaks, chrom_sizes, meta, annot = NULL) {
 
 get_motif_stats <- function(dec_res, dec_for_motifs) {
   d1 <- dec_for_motifs |> 
-    distinct(contrast, peak_id) |> 
-    count(contrast, name = "DB peaks")
+    distinct(contrast_direction, peak_id) |> 
+    count(contrast_direction, name = "DB peaks")
   d2 <- dec_res |> 
-    distinct(contrast, peak_id) |> 
-    count(contrast, name = "Peaks with hits")
+    distinct(contrast_direction, peak_id) |> 
+    count(contrast_direction, name = "Peaks with hits")
   d3 <- dec_res |> 
-    distinct(contrast, motif_name, peak_id) |> 
-    count(contrast, peak_id) |> 
-    group_by(contrast) |> 
+    distinct(contrast_direction, motif_name, peak_id) |> 
+    count(contrast_direction, peak_id) |> 
+    group_by(contrast_direction) |> 
     summarise(`Motifs per peak` = mean(n), .groups = "drop")
   d4 <- dec_res |> 
-    distinct(contrast, motif_name) |> 
-    count(contrast, name = "Unique motifs")
+    distinct(contrast_direction, motif_name) |> 
+    count(contrast_direction, name = "Unique motifs")
 
-  inner_join(d1, d2, by = "contrast") |>
-    inner_join(d3, by = "contrast") |>
-    inner_join(d4, by = "contrast")
+  inner_join(d1, d2, by = "contrast_direction") |>
+    inner_join(d3, by = "contrast_direction") |>
+    inner_join(d4, by = "contrast_direction")
 }
 
 get_top_motif_stats <- function(dec_res, n_top = 30) {
@@ -247,7 +247,7 @@ tabulate_annotations <- function(an, group_var, annot_var, n_top = NULL, rand_an
     ra <- rand_an |> 
       mutate(ann = get(annot_var)) |> 
       select(peak_id, ann) |> 
-      mutate(grp = "Random")
+      mutate(grp = "Background")
     d <- d |> 
       bind_rows(ra)
   }
@@ -269,7 +269,8 @@ tabulate_annotations <- function(an, group_var, annot_var, n_top = NULL, rand_an
         select(-tst)
     }) |> 
     list_rbind() |> 
-    rename(prop = estimate)
+    rename(prop = estimate) |> 
+    mutate(grp = fct_relevel(grp, "Background", after = Inf))
 
   if(order_annot)
     dc <- dc |> mutate(ann = fct_reorder(ann, -n))
@@ -347,4 +348,114 @@ annotation_fisher_example <- function(tst, annot = "Promoter", group = "48h_Ctrl
     "In group", d$n_ann_grp, d$n_notann_grp,
     "Not in group", d$n_ann_notgrp, d$n_notann_notgrp
   )
+}
+
+
+# boths decs contain only significant peaks
+compare_atac_cut_ <- function(dec_atac, dec_cut) {
+  
+  gr_atac <- GenomicRanges::makeGRangesFromDataFrame(dec_atac)
+  tot_atac <- dec_atac |> 
+    count(contrast_direction, name = "n_atac")
+  
+  map(c("Ctrl", "SETDB1"), function(treat) {
+    map(c("down", "up"), function(dir) {
+      ctr <- str_glue("48h_{treat}-iPS_{treat}_{dir}")
+      gr_cut <- dec_cut |> 
+        filter(contrast_direction == ctr) |> 
+        GenomicRanges::makeGRangesFromDataFrame()
+      hits <- GenomicRanges::findOverlaps(
+        query = gr_cut,
+        subject = gr_atac,
+        ignore.strand = TRUE
+      )
+      cut_hits <- S4Vectors::queryHits(hits) |> unique()
+      atac_hits <- S4Vectors::subjectHits(hits) |> unique()
+
+      dec_atac[atac_hits, ] |> 
+        count(contrast_direction, name = "n_atac_cut") |> 
+        add_column(cut_contrast = ctr) |> 
+        left_join(tot_atac, by = "contrast_direction") |> 
+        mutate(
+        )
+    }) |> 
+      list_rbind()
+  }) |> 
+    list_rbind() |> 
+    rename(atac_contrast = contrast_direction) |> 
+    relocate(cut_contrast, .before = 1)
+}
+
+
+
+
+compare_atac_cut <- function(dec_atac, dec_cut) {
+  atac_contrasts <- unique(dec_atac$contrast_direction)
+  
+  map(c("Ctrl", "SETDB1"), function(treat) {
+    map(c("down", "up"), function(dir) {
+      cut_ctr <- as.character(str_glue("48h_{treat}-iPS_{treat}_{dir}"))
+      cut <- dec_cut |> 
+        filter(contrast_direction == cut_ctr & sig) |> 
+        distinct(chr, start, end)
+      gr_cut <- GenomicRanges::makeGRangesFromDataFrame(cut)
+      
+      map(atac_contrasts, function(atac_ctr) {
+        atac <- dec_atac |> 
+          filter(contrast_direction == atac_ctr) |> 
+          distinct(chr, start, end, sig)
+        gr_atac <- GenomicRanges::makeGRangesFromDataFrame(atac)
+        cut_overlap <- GenomicRanges::countOverlaps(
+          gr_atac,
+          gr_cut,
+          ignore.strand = TRUE
+        ) > 0
+        
+        d <- tibble(
+          n_atac_cut = sum(atac$sig & cut_overlap),
+          n_atac_ncut = sum(atac$sig & !cut_overlap),
+          n_natac_cut = sum(!atac$sig & cut_overlap),
+          n_natac_ncut = sum(!atac$sig & !cut_overlap)
+        )
+        
+        x <- d |> 
+          as.numeric() |> 
+          matrix(nrow = 2, byrow = TRUE)
+        cutover_prop = x[1, 1] / sum(x[, 1])
+        ncutover_prop = x[1, 2] / sum(x[, 2])
+        
+        fisher.test(x, alternative = "greater") |> 
+          broom::tidy() |> 
+          mutate(
+            cut_contrast = cut_ctr,
+            atac_contrast = atac_ctr,
+            n_cut = nrow(cut),
+            n_atac = sum(atac$sig),
+            cutover_prop,
+            ncutover_prop,
+            atac_status = case_when(
+              cutover_prop > ncutover_prop ~ "enriched",
+              cutover_prop < ncutover_prop ~ "depleted",
+              TRUE ~ "unchanged"
+            ),
+            x = list(x)
+          )
+      }) |> 
+        list_rbind()
+    }) |> 
+      list_rbind()
+  }) |> 
+    list_rbind() |> 
+    select(
+      cut_contrast, atac_contrast,
+      starts_with("n_"),
+      ends_with("_prop"),
+      atac_status,
+      x,
+      odds_ratio = estimate,
+      ci_lo = conf.low,
+      ci_up = conf.high,
+      p_value = p.value
+    ) |> 
+    mutate(fdr = p.adjust(p_value, method = "BH"))
 }
