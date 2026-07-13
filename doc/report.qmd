@@ -411,18 +411,17 @@ For functional enrichment peaks need to be assigned to genes, which in turn, are
 
 ## Model with two factors
 
-The design included two factors: time point (iPS vs PSM) and treatment (control vs SETDB1 siRNA). @fig-volcano-full-libs-broad shows the volcano plot, @fig-up-down-full-libs-broad shows the number of peaks going up and down between factors.
+The design included two factors: time point (iPS vs PSM) and treatment (control vs SETDB1 siRNA). @fig-volcano-full-libs-narrow shows the volcano plot, @fig-up-down-full-libs-narrow shows the number of peaks going up and down between factors.
 
 ```{r}
-#| label: fig-volcano-full-libs-broad
+#| label: fig-volcano-full-libs-narrow
 #| fig-cap: Volcano plots for differential binding analysis. Black points indicate statistically significant peaks.
-#| fig-width: 8
-#| fig-height: 4
-tar_read(fig_volcano_full_libs_narrow)
+#| out.width: 100%
+knitr::include_graphics("images/volcano_full_libs_narrow.png")
 ```
 
 ```{r}
-#| label: fig-up-down-full-libs-broad
+#| label: fig-up-down-full-libs-narrow
 #| fig-cap: Number of up- and down-regulated peaks for time point effect (iPS vs PSM) and treatment effect (control vs SETDB1 siRNA), using broad peaks.
 #| fig-width: 2.2
 #| fig-height: 4
@@ -431,10 +430,10 @@ tar_read(fig_up_down_full_libs_narrow)
 
 ### Annotation of differentially binding peaks
 
-@fig-dec-chipseeker-full-libs-broad shows the results of *ChIPseeker* annotation of the differentially binding peaks.
+@fig-dec-chipseeker-full-libs-narrow shows the results of *ChIPseeker* annotation of the differentially binding peaks.
 
 ```{r}
-#| label: fig-dec-chipseeker-full-libs-broad
+#| label: fig-dec-chipseeker-full-libs-narrow
 #| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. **A** Proporiton of annotations among all peaks. **B** Fisher's test results for each group."
 #| fig-width: 8
 #| fig-height: 4
@@ -451,15 +450,14 @@ plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
 The design included selected pairwise comparison between conditions.
 
 ```{r}
-#| label: fig-volcano-groups-libs-broad
+#| label: fig-volcano-groups-libs-narrow
 #| fig-cap: Volcano plots for differential binding analysis using broad peaks, for pair-wise contrasts.
-#| fig-width: 8
-#| fig-height: 7
-tar_read(fig_volcano_groups_libs_narrow)
+#| out.width: 100%
+knitr::include_graphics("images/volcano_groups_libs_narrow.png")
 ```
 
 ```{r}
-#| label: fig-up-down-groups-libs-broad
+#| label: fig-up-down-groups-libs-narrow
 #| fig-cap: Number of up- and down-regulated peaks for pairwise-contrasts.
 #| fig-width: 4
 #| fig-height: 4
@@ -468,10 +466,10 @@ tar_read(fig_up_down_groups_libs_narrow)
 
 ### Annotation of differentially binding peaks
 
-@fig-dec-chipseeker-groups-libs-broad shows the proportion of *ChIPSeeker* annotations in each contrast, split between peaks going up and down. A Fisher's test on the proportion in each contrast/annotation against the pooled background was performed to asses the statistical significance of the observed changes (see [note in the H3meCUT&Tag report](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3mecut/doc/report.html#sec-annotation-enrichment-note)). Panel **B** shows the results. Asterisks indicated groups significantly different from the pooled background. Another aspect of the same data is shown in @fig-dec-chipseeker-err-groups-libs-broad.
+@fig-dec-chipseeker-groups-libs-narrow shows the proportion of *ChIPSeeker* annotations in each contrast, split between peaks going up and down. A Fisher's test on the proportion in each contrast/annotation against the pooled background was performed to asses the statistical significance of the observed changes (see [note in the H3meCUT&Tag report](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3mecut/doc/report.html#sec-annotation-enrichment-note)). Panel **B** shows the results. Asterisks indicated groups significantly different from the pooled background. Another aspect of the same data is shown in @fig-dec-chipseeker-err-groups-libs-narrow.
 
 ```{r}
-#| label: fig-dec-chipseeker-groups-libs-broad
+#| label: fig-dec-chipseeker-groups-libs-narrow
 #| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. **A** Proporiton of annotations among all peaks. **B** Fisher's test results for each group. The colour shows the odds ratio, with red indicating an enrichment and blue indicating a depletion. The original odds ratio is always positive, here it is multiplied by -1 for depleted annotations. The asterisk indicates statistical significance. Background contains peaks with FDR > 0.01 and |logFC| <= 1."
 #| fig-width: 8
 #| fig-height: 4
@@ -481,7 +479,7 @@ plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
 ```
 
 ```{r}
-#| label: fig-dec-chipseeker-err-groups-libs-broad
+#| label: fig-dec-chipseeker-err-groups-libs-narrow
 #| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. 95% confidence intervals of a proportions are shown."
 #| fig-width: 8
 #| fig-height: 5
@@ -492,7 +490,7 @@ tar_read(fig_dec_chipseeker_err_groups_libs_narrow)
 ### Gene set enrichment
 
 ```{r}
-#| label: tbl-gse-groups-libs-broad
+#| label: tbl-gse-groups-libs-narrow
 #| tbl-cap: Functional terms enriched (FDR < 0.05) in GSE for the model with pair-wise contrasts.
 tar_read(gse_tab_groups_libs_narrow) |> 
   select(`Term ID` = term_id, Name = term_name, Contrast = contrast, NES = nes, Size = size, `Top genes` = genes) |> 
@@ -535,21 +533,21 @@ In this Section we report results per *RepeatMasker* family, with class name inc
 
 ## Peaks per RepeatMasker family sequence
 
-@fig-groups-rmsk-broad shows the proportions of MACS peaks mapping to a *RepeatMasker* sequences in each family. 
+@fig-groups-rmsk-narrow shows the proportions of MACS peaks mapping to a *RepeatMasker* sequences in each family. 
 
 ```{r}
-#| label: fig-groups-rmsk-broad
+#| label: fig-groups-rmsk-narrow
 #| fig-cap: RepeatMasker categories in broad peaks for the top 30,000 MACS peaks, per condition.
 #| fig-width: 3.5
 #| fig-height: 4
 tar_read(fig_groups_rmsk_narrow)
 ```
 
-@fig-dec-rmsk-broad shows the proportions of differentially bound peaks across *RepeatMasker* categories and their significance.
+@fig-dec-rmsk-narrow shows the proportions of differentially bound peaks across *RepeatMasker* categories and their significance.
 
 ```{r}
-#| label: fig-dec-rmsk-broad
-#| fig-cap: RepeatMasker categories in broad peaks for the differentially binding peaks using the pairwise model with library size normalisation.
+#| label: fig-dec-rmsk-narrow
+#| fig-cap: RepeatMasker categories in narrow peaks for the differentially binding peaks using the pairwise model with library size normalisation.
 #| fig-width: 7
 #| fig-height: 4
 pl1 <- tar_read(fig_dec_rmsk_groups_libs_narrow)
@@ -689,6 +687,8 @@ x1 <- r1 |>
   pluck(1)
 colnames(x1) <- c("ATAC Overlapping with CUT", "ATAC Not Overlapping with CUT")
 rownames(x1) <- c("ATAC significant", "ATAC not significant")
+storage.mode(x1) <- "integer" # otherwise large numbers are printed as 2.611^{4}
+
 x1 |> 
   as_tibble(rownames = ".") |> 
   gt()
@@ -708,6 +708,8 @@ x2 <- r2 |>
   pluck(1)
 colnames(x2) <- c("ATAC Overlapping with CUT", "ATAC Not Overlapping with CUT")
 rownames(x2) <- c("ATAC significant", "ATAC not significant")
+storage.mode(x2) <- "integer"
+
 x2 |> 
   as_tibble(rownames = ".") |> 
   gt()

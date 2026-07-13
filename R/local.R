@@ -390,62 +390,64 @@ compare_atac_cut_ <- function(dec_atac, dec_cut) {
 
 
 compare_atac_cut <- function(dec_atac, dec_cut) {
-  atac_contrasts <- unique(dec_atac$contrast_direction)
   
-  map(c("Ctrl", "SETDB1"), function(treat) {
-    map(c("down", "up"), function(dir) {
-      cut_ctr <- as.character(str_glue("48h_{treat}-iPS_{treat}_{dir}"))
-      cut <- dec_cut |> 
-        filter(contrast_direction == cut_ctr & sig) |> 
-        distinct(chr, start, end)
-      gr_cut <- GenomicRanges::makeGRangesFromDataFrame(cut)
+  use_contrasts <- c(
+    "48h_Ctrl-iPS_Ctrl_down",
+    "48h_Ctrl-iPS_Ctrl_up",
+    "48h_SETDB1-iPS_SETDB1_down",
+    "48h_SETDB1-iPS_SETDB1_up"
+  )
+  
+  map(use_contrasts, function(cut_ctr) {
+    cut <- dec_cut |> 
+      filter(contrast_direction == cut_ctr & sig) |> 
+      distinct(chr, start, end)
+    gr_cut <- GenomicRanges::makeGRangesFromDataFrame(cut)
+    
+    map(use_contrasts, function(atac_ctr) {
+      atac <- dec_atac |> 
+        filter(contrast_direction == atac_ctr) |> 
+        distinct(chr, start, end, sig)
+      gr_atac <- GenomicRanges::makeGRangesFromDataFrame(atac)
+      cut_overlap <- GenomicRanges::countOverlaps(
+        gr_atac,
+        gr_cut,
+        ignore.strand = TRUE
+      ) > 0
       
-      map(atac_contrasts, function(atac_ctr) {
-        atac <- dec_atac |> 
-          filter(contrast_direction == atac_ctr) |> 
-          distinct(chr, start, end, sig)
-        gr_atac <- GenomicRanges::makeGRangesFromDataFrame(atac)
-        cut_overlap <- GenomicRanges::countOverlaps(
-          gr_atac,
-          gr_cut,
-          ignore.strand = TRUE
-        ) > 0
-        
-        d <- tibble(
-          n_atac_cut = sum(atac$sig & cut_overlap),
-          n_atac_ncut = sum(atac$sig & !cut_overlap),
-          n_natac_cut = sum(!atac$sig & cut_overlap),
-          n_natac_ncut = sum(!atac$sig & !cut_overlap)
-        )
-        
-        x <- d |> 
-          as.numeric() |> 
-          matrix(nrow = 2, byrow = TRUE)
+      d <- tibble(
+        n_atac_cut = sum(atac$sig & cut_overlap),
+        n_atac_ncut = sum(atac$sig & !cut_overlap),
+        n_natac_cut = sum(!atac$sig & cut_overlap),
+        n_natac_ncut = sum(!atac$sig & !cut_overlap)
+      )
+      
+      x <- d |> 
+        as.numeric() |> 
+        matrix(nrow = 2, byrow = TRUE)
         cutover_prop = x[1, 1] / sum(x[, 1])
         ncutover_prop = x[1, 2] / sum(x[, 2])
-        
-        fisher.test(x, alternative = "greater") |> 
-          broom::tidy() |> 
-          mutate(
-            cut_contrast = cut_ctr,
-            atac_contrast = atac_ctr,
-            n_cut = nrow(cut),
-            n_atac = sum(atac$sig),
-            cutover_prop,
-            ncutover_prop,
-            atac_status = case_when(
-              cutover_prop > ncutover_prop ~ "enriched",
-              cutover_prop < ncutover_prop ~ "depleted",
-              TRUE ~ "unchanged"
-            ),
-            x = list(x)
-          )
-      }) |> 
-        list_rbind()
+      
+      fisher.test(x, alternative = "greater") |> 
+      broom::tidy() |> 
+      mutate(
+        cut_contrast = cut_ctr,
+        atac_contrast = atac_ctr,
+        n_cut = nrow(cut),
+        n_atac = sum(atac$sig),
+        cutover_prop,
+        ncutover_prop,
+        atac_status = case_when(
+          cutover_prop > ncutover_prop ~ "enriched",
+          cutover_prop < ncutover_prop ~ "depleted",
+          TRUE ~ "unchanged"
+        ),
+        x = list(x)
+      )
     }) |> 
-      list_rbind()
-  }) |> 
-    list_rbind() |> 
+    list_rbind()
+  }) |>
+  list_rbind() |> 
     select(
       cut_contrast, atac_contrast,
       starts_with("n_"),
@@ -457,5 +459,31 @@ compare_atac_cut <- function(dec_atac, dec_cut) {
       ci_up = conf.high,
       p_value = p.value
     ) |> 
-    mutate(fdr = p.adjust(p_value, method = "BH"))
+  mutate(fdr = p.adjust(p_value, method = "BH"))
+}
+
+get_atac_cut_overlaps <- function(dec_atac_chipseeker, dec_cut, ctr_atac, ctr_cut) {
+  cut <- dec_cut |> 
+    filter(contrast_direction == ctr_cut & sig) |> 
+    distinct(chr, start, end) |> 
+    mutate(cut_coords = str_glue("{chr}:{start}-{end}")) |> 
+    mutate(idx = row_number())
+  atac_ctr <- dec_atac_chipseeker |> 
+    filter(contrast_direction == ctr_atac & sig)
+  atac <- atac_ctr |> 
+    distinct(chr, start, end) |> 
+    mutate(atac_coords = str_glue("{chr}:{start}-{end}")) |> 
+    mutate(idx = row_number())
+  over <- GenomicRanges::findOverlaps(
+    query = GenomicRanges::makeGRangesFromDataFrame(atac),
+    subject = GenomicRanges::makeGRangesFromDataFrame(cut),
+    ignore.strand = TRUE
+  )
+
+  over |> 
+    as_tibble() |> 
+    left_join(atac, by = join_by(queryHits == idx)) |> 
+    left_join(cut, by = join_by(subjectHits == idx)) |> 
+    select(cut_coords, atac_coords) |> 
+    left_join(atac_ctr, by = join_by(atac_coords == peak_id))
 }

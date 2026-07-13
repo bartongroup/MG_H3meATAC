@@ -411,6 +411,8 @@ plot_peak_rmsk <- function(dec, fdr_limit = NULL, ncol = 1, top_n = 16) {
 
 
 plot_db_clustering <- function(db, meta, text_size = 10, colour_var = "group") {
+  env <- new.env(parent = globalenv())
+  
   tab <- db$binding[, 4:ncol(db$binding)]
 
   dendr <- t(tab) |> 
@@ -418,15 +420,15 @@ plot_db_clustering <- function(db, meta, text_size = 10, colour_var = "group") {
     hclust(method = "complete") |>
     dendsort::dendsort() |> 
     ggdendro::dendro_data()
-  seg <- ggdendro::segment(dendr)
   meta <- meta |>
-    mutate(
-      colvar = get(colour_var)
-    )
-  labs <- left_join(dendr$labels |> mutate(label = as.character(label)), meta, by = c("label" = "sample")) |> 
+    mutate(colvar = get(colour_var))
+
+  env$seg <- ggdendro::segment(dendr)
+  
+  env$labs <- left_join(dendr$labels |> mutate(label = as.character(label)), meta, by = c("label" = "sample")) |> 
     mutate(colour = okabe_ito_palette[as_factor(colvar)])
  
- theme.d <- ggplot2::theme(
+  env$theme.d <- ggplot2::theme(
     panel.grid.major = ggplot2::element_blank(),
     panel.grid.minor = ggplot2::element_blank(),
     panel.background = ggplot2::element_blank(),
@@ -436,14 +438,16 @@ plot_db_clustering <- function(db, meta, text_size = 10, colour_var = "group") {
     axis.ticks.y = ggplot2::element_blank()
   )
   
-  ggplot() +
-    theme.d +
-    coord_flip() +
-    geom_segment(data = seg, aes(x = x, y = y, xend = xend, yend = yend)) +
-    scale_x_continuous(breaks = seq_along(labs$label), labels = labs$label) +
-    scale_y_continuous(expand = c(0,0), limits = c(0, max(seg$y) * 1.03)) +
-    scale_colour_manual(values = okabe_ito_palette) +
-    labs(x = NULL, y = "Distance")
+  with(env, {
+    ggplot() +
+      theme.d +
+      coord_flip() +
+      geom_segment(data = seg, aes(x = x, y = y, xend = xend, yend = yend)) +
+      scale_x_continuous(breaks = seq_along(labs$label), labels = labs$label) +
+      scale_y_continuous(expand = c(0,0), limits = c(0, max(seg$y) * 1.03)) +
+      scale_colour_manual(values = okabe_ito_palette) +
+      labs(x = NULL, y = "Distance")
+  })
 }
 
 

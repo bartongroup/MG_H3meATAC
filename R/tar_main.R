@@ -130,7 +130,7 @@ targets_main <- function() {
         # Extract DE results in a useful format
         dec = extract_de_results(dbc),
 
-        fig_volcano = plot_volcano(dec, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit),
+        png_volcano = plot_volcano(dec, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit) |> gs(paste0("volcano", "_", MODEL, "_", NORM, "_", TYPE), 8, 6),
         fig_pdist = plot_pdist(dec),
         fig_up_down = plot_up_down(dec, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit),
 
@@ -199,8 +199,9 @@ targets_main <- function() {
 
   cuttag_comparison <- tar_plan(
     dec_cut = readr::read_rds("cache/dec_cut.rds") |> dplyr::mutate(sig = fdr < 0.01 & abs(log_fc) > 0.58),
-    dec_atac = dec_groups_libs_narrow |> dplyr::mutate(sig = fdr < 0.01 & abs(log_fc) > 1),
-    cmp_cut_atac = compare_atac_cut(dec_cut, dec_atac)
+    dec_atac = dec_chipseeker_groups_libs_narrow |> dplyr::mutate(sig = fdr < 0.01 & abs(log_fc) > 1),
+    cmp_cut_atac = compare_atac_cut(dec_atac, dec_cut),
+    over_cut_atac_up_up = get_atac_cut_overlaps(dec_atac, dec_cut, "48h_Ctrl-iPS_Ctrl_up", "48h_Ctrl-iPS_Ctrl_up")
   )
  
 
