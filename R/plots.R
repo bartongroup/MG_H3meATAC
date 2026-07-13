@@ -432,7 +432,7 @@ plot_db_clustering <- function(db, meta, text_size = 10, colour_var = "group") {
     panel.grid.major = ggplot2::element_blank(),
     panel.grid.minor = ggplot2::element_blank(),
     panel.background = ggplot2::element_blank(),
-    axis.text.y = ggplot2::element_text(size = text_size, colour = labs$colour),
+    axis.text.y = ggplot2::element_text(size = text_size, colour = env$labs$colour),
     axis.line.y = ggplot2::element_blank(),
     axis.line.x = ggplot2::element_line(linewidth = 0.5),
     axis.ticks.y = ggplot2::element_blank()
