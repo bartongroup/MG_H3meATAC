@@ -201,7 +201,11 @@ targets_main <- function() {
     dec_cut = readr::read_rds("cache/dec_cut.rds") |> dplyr::mutate(sig = fdr < 0.01 & abs(log_fc) > 0.58),
     dec_atac = dec_chipseeker_groups_libs_narrow |> dplyr::mutate(sig = fdr < 0.01 & abs(log_fc) > 1),
     cmp_cut_atac = compare_atac_cut(dec_atac, dec_cut),
-    over_cut_atac_up_up = get_atac_cut_overlaps(dec_atac, dec_cut, "48h_Ctrl-iPS_Ctrl_up", "48h_Ctrl-iPS_Ctrl_up")
+    over_cut_atac_ctrl = get_atac_cut_overlaps(dec_atac, dec_cut, "48h_Ctrl-iPS_Ctrl", "48h_Ctrl-iPS_Ctrl"),
+    over_cut_atac_set = get_atac_cut_overlaps(dec_atac, dec_cut, "48h_SETDB1-iPS_SETDB1", "48h_SETDB1-iPS_SETDB1"),
+    fig_over_cut_atac_fcfc_ctrl = plot_cut_atac_fcfc(over_cut_atac_ctrl),
+    fig_over_cut_atac_fcfc_set = plot_cut_atac_fcfc(over_cut_atac_set)
+
   )
  
 
@@ -223,6 +227,9 @@ targets_main <- function() {
     fig_de_abu_example_1 = plot_peak_bindings(dbc_groups_libs_narrow, "8:37374556-37375887", metadata),
     dec_ctr = dec_groups_libs_narrow |> dplyr::filter(contrast == "48h_Ctrl-iPS_Ctrl"),
     fig_de_peak_example_1 = plot_region_ggbio_peak_id(dec_ctr, "8:37374556-37375887", config, metadata, peaks_narrow = peaks_narrow, normfac = normfac |> dplyr::mutate(norm = libs_norm)),
+
+    smpls = metadata |> filter(treatment == "Ctrl" ) |> pull(sample) |> as.character(),
+    png_atac_cut_example = plot_region_ggbio(smpls, config, metadata, make_region(18, 69935096, 69935793), peaks_broad = NULL, peaks_narrow = peaks_narrow) |> gs("atac_cut_example", width = 8, height = 8),
 
     normfac = tibble::tibble(
       sample = db_libs_narrow$samples$SampleID,

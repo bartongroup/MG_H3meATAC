@@ -692,3 +692,21 @@ plot_annot_group_test <- function(tst, fdr_limit = 0.01, max_or = 5) {
     scale_fill_distiller(type = "div", palette = "RdBu", limits = c(-mx, mx)) +
     labs(x = NULL, y = NULL, fill = "Odds Ratio")
 }
+
+
+plot_cut_atac_fcfc <- function(over_cut_atac) {
+  ov_n_n <- over_cut_atac |> filter(!sig_atac & !sig_cut)
+  ov_s_n <- over_cut_atac |> filter(sig_atac & !sig_cut)
+  ov_n_s <- over_cut_atac |> filter(!sig_atac & sig_cut)
+  ov_s_s <- over_cut_atac |> filter(sig_atac & sig_cut)
+
+  ggplot(ov_n_n, aes(x = log_fc_atac, y = log_fc_cut)) +
+    th() +
+    geom_point(colour = "grey70", size = 0.5) +
+    geom_point(data = ov_s_n, colour = okabe_ito_palette[1], size = 0.7) +
+    geom_point(data = ov_n_s, colour = okabe_ito_palette[2], size = 0.7) +
+    geom_point(data = ov_s_s, colour = okabe_ito_palette[3], size = 0.7) +
+    geom_hline(yintercept = 0, colour = "grey40") +
+    geom_vline(xintercept = 0, colour = "grey40") +
+    labs(x = "Log2 Fold Change (ATAC)", y = "Log2 Fold Change (Cut)")
+}

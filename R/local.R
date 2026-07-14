@@ -462,17 +462,12 @@ compare_atac_cut <- function(dec_atac, dec_cut) {
   mutate(fdr = p.adjust(p_value, method = "BH"))
 }
 
-get_atac_cut_overlaps <- function(dec_atac_chipseeker, dec_cut, ctr_atac, ctr_cut) {
+get_atac_cut_overlaps <- function(dec_atac, dec_cut, ctr_atac, ctr_cut) {
   cut <- dec_cut |> 
-    filter(contrast_direction == ctr_cut & sig) |> 
-    distinct(chr, start, end) |> 
-    mutate(cut_coords = str_glue("{chr}:{start}-{end}")) |> 
+    filter(contrast == ctr_cut) |>
     mutate(idx = row_number())
-  atac_ctr <- dec_atac_chipseeker |> 
-    filter(contrast_direction == ctr_atac & sig)
-  atac <- atac_ctr |> 
-    distinct(chr, start, end) |> 
-    mutate(atac_coords = str_glue("{chr}:{start}-{end}")) |> 
+  atac <- dec_atac |> 
+    filter(contrast == ctr_atac) |>
     mutate(idx = row_number())
   over <- GenomicRanges::findOverlaps(
     query = GenomicRanges::makeGRangesFromDataFrame(atac),
@@ -483,7 +478,5 @@ get_atac_cut_overlaps <- function(dec_atac_chipseeker, dec_cut, ctr_atac, ctr_cu
   over |> 
     as_tibble() |> 
     left_join(atac, by = join_by(queryHits == idx)) |> 
-    left_join(cut, by = join_by(subjectHits == idx)) |> 
-    select(cut_coords, atac_coords) |> 
-    left_join(atac_ctr, by = join_by(atac_coords == peak_id))
+    left_join(cut, by = join_by(subjectHits == idx), suffix = c("_atac", "_cut"))
 }

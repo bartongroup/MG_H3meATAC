@@ -666,6 +666,8 @@ tar_read(tf_enr) |>
 tar_load(cmp_cut_atac)
 ```
 
+## Significant peak counts
+
 A comparison of CUT&Tag and ATAC-seq peaks changing upon differentiation was carried out. The *DiffBind* results for broad peaks (CUT&Tag) were compared to narrow peaks from ATAC-seq. The following directional contrasts of CUT&Tag were considered:
 
  - 48h_Ctrl-iPS_Ctrl_down
@@ -675,10 +677,10 @@ A comparison of CUT&Tag and ATAC-seq peaks changing upon differentiation was car
 
 For each contrast significant (FDR < 0.01 and |log2 FC| > 0.58) were selected, as described in the [CUT&Tag report](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3mecut/doc/report.html#model-with-pair-wise-contrasts). These are peaks that gain (up) or lose (down) H3K9me3 upon differentiation. These were compared with all direction contrasts in ATAC-sec data.
 
-The comparison we based on enrichment using Fisher's test. Let's take `48h_Ctrl-iPS_Ctrl_up` in CUT&Tag and `48h_Ctrl-iPS_Ctrl_down` in ATAC-seq as an example. That is, we ask a question: do peaks gaining H3K9me3 upon differentiation lose chromatin access upon differentiation? All statistically significant peaks in `48h_Ctrl-iPS_Ctrl_up` in CUT&Tag (peaks gaining H3K9me3 upon differentiation) were used. An overlap with all ATAC-seq peaks in the `48h_Ctrl-iPS_Ctrl_down` contrast, significant and not, was calculated. The contingency table for overlap/significance comparison is shown in @tbl-atac-cut-contingency-up-down.
+The comparison we based on enrichment using Fisher's test. Let's take `48h_Ctrl-iPS_Ctrl_up` in CUT&Tag and `48h_Ctrl-iPS_Ctrl_down` in ATAC-seq as an example. That is, we ask a question: do peaks gaining H3K9me3 upon differentiation lose chromatin access upon differentiation? All statistically significant peaks in `48h_Ctrl-iPS_Ctrl_up` in CUT&Tag (peaks gaining H3K9me3 upon differentiation) were used. An overlap with all ATAC-seq peaks in the `48h_Ctrl-iPS_Ctrl_down` contrast, significant and not, was calculated. The contingency table for overlap/significance comparison is shown in @tbl-cut-atac-contingency-up-down.
 
 ```{r}
-#| label: tbl-atac-cut-contingency-up-down
+#| label: tbl-cut-atac-contingency-up-down
 #| tbl-cap: Contingency table for `48h_Ctrl-iPS_Ctrl_up` in CUT&Tag and `48h_Ctrl-iPS_Ctrl_down` in ATAC-seq.
 r1 <- cmp_cut_atac |> 
   filter(cut_contrast == "48h_Ctrl-iPS_Ctrl_up" & atac_contrast == "48h_Ctrl-iPS_Ctrl_down")
@@ -699,7 +701,7 @@ The proportion of ATAC significant peaks among those overlapping with CUT&Tag (l
 Now, let us compare `48h_Ctrl-iPS_Ctrl_up` in both data sets. The question asked is do peaks gaining H3K9me3 upon differentiation *gain* chromatin access upon differentiation?
 
 ```{r}
-#| label: tbl-atac-cut-contingency-up-up
+#| label: tbl-cut-atac-contingency-up-up
 #| tbl-cap: Contingency table for `48h_Ctrl-iPS_Ctrl_up` in CUT&Tag and `48h_Ctrl-iPS_Ctrl_up` in ATAC-seq.
 r2 <- cmp_cut_atac |> 
   filter(cut_contrast == "48h_Ctrl-iPS_Ctrl_up" & atac_contrast == "48h_Ctrl-iPS_Ctrl_up")
@@ -718,7 +720,7 @@ x2 |>
 The proportion of ATAC significant peaks among those overlapping with CUT&Tag (left column) is `r x2[1, 1]` / (`r x2[1, 1]` + `r x2[2, 1]`) = `r r2$cutover_prop |> signif(3)`. The corresponding proportion among ATAC peaks not overlapping with CUT&Tag is `r x2[1, 2]` / (`r x2[1, 2]` + `r x2[2, 2] |> as.integer()`) = `r r2$ncutover_prop |> signif(3)`. There is strong enrichment in the ATAC significant peaks among those overlapping with CUT&Tag, with FDR = $`r sci(r2$fdr, 1)`$. This means there is a very strong correlation between peaks gaining H3K9me3 and gaining accessibility upon differentiation. This is opposite to what was expected.
 
 ```{r}
-#| label: tbl-atac-cut-compare-all
+#| label: tbl-cut-atac-compare-all
 #| tbl-cap: All significant (FDR < 0.01) results from CUT&Tag/ATAC-seq comparison.
 cmp_cut_atac |> 
   filter(fdr < 0.01) |> 
@@ -734,6 +736,21 @@ cmp_cut_atac |>
     n_sigfig = 2
   )
 ```
+
+## Fold change comparison
+
+An alternative approach to ATAC-seq and CUT&Tag comparison is to find all overlapping peaks (significant or not) in given contrast (going both up and down) and make a plot. The result is shown in @fig-cut-atac-fcfc. There is a visible correlation between peaks changing significantly in both sets.
+
+```{r}
+#| label: fig-cut-atac-fcfc
+#| fig-cap: Log2 FC comparison between overlapping peaks in ATAC-seq and CUT&Tag. Grey points indicate peaks that are not significant in any data set, orange - significant in ATAC only, blue - significant in CUT only and green - significant in both sets. A. 48h_Ctrl vs iPS_Ctrl. B. 48h_SETDB1 vs iPS_SETDB1.
+#| fig-width: 8
+#| fig-height: 4
+pl1 <- tar_read(fig_over_cut_atac_fcfc_ctrl)
+pl2 <- tar_read(fig_over_cut_atac_fcfc_set)
+plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
+```
+
 
 # Resources
 
