@@ -375,7 +375,7 @@ In order to create a PCA plot for peak data, consensus peaks present in at least
 #| fig-cap: PCA plot for consensus peak data.
 #| fig-width: 5
 #| fig-height: 3.5
-tar_read(fig_pca)
+tar_read(fig_pca) 
 ```
 
 ## Peak annotations

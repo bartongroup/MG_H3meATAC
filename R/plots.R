@@ -169,17 +169,21 @@ plot_pca <- function(db, meta) {
     as.matrix()
 
   pca <- prcomp(t(log2(mat + 1)), scale. = TRUE)
-
+  var.perc <- 100 * (pca$sdev)^2 / sum((pca$sdev)^2)
+  
   env <- new.env(parent = globalenv())
   env$pca_df <- as_tibble(pca$x[, 1:2], rownames = "sample") |>
     left_join(meta, by = "sample")
+  env$pca1 <- sprintf("PCA1 (%5.1f%%)", var.perc[1])
+  env$pca2 <- sprintf("PCA2 (%5.1f%%)", var.perc[2])
 
   with(env, {
     pca_df |> 
       ggplot(aes(x = PC1, y = PC2, colour = group, shape = replicate)) +
       th() +
       geom_point(size = 3) +
-      scale_colour_manual(values = okabe_ito_palette)
+      scale_colour_manual(values = okabe_ito_palette) +
+      labs(x = pca1, y = pca2)
   })
 }
 
