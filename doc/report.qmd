@@ -366,6 +366,17 @@ tar_read(fig_peak_width_narrow)
 tar_read(fig_peak_example_1)
 ```
 
+## PCA
+
+In order to create a PCA plot for peak data, consensus peaks present in at least two replicates in each condition were found using *DiffBind*, and normalised signal was found in each peak in each sample. This is the same analysis pipeline as used in @sec-diffbind. These data were used to create a PCA plot shown in @fig-pca.
+
+```{r}
+#| label: fig-pca
+#| fig-cap: PCA plot for consensus peak data.
+#| fig-width: 5
+#| fig-height: 3.5
+tar_read(fig_pca)
+```
 
 ## Peak annotations
 
@@ -388,7 +399,7 @@ plot_grid(pl1, pl2, pl3, nrow = 2, labels = c("A ", "B", "C"), rel_widths = c(1,
 
 ```{r}
 #| label: fig-peaks-tss
-#| fig-cap: Coverage of peaks around the TSS in four conditions, using all broad peaks.
+#| fig-cap: Coverage of peaks around the TSS in four conditions, using all narrow peaks.
 #| fig-width: 8
 #| fig-height: 3
 tar_read(fig_groups_tss_narrow) 
@@ -404,9 +415,9 @@ For functional enrichment peaks need to be assigned to genes, which in turn, are
 
 
 
-# Differential binding analysis
+# Differential binding analysis {#sec-diffbind}
 
-[Differential binding analysis](https://bioconductor.org/packages/release/bioc/vignettes/DiffBind/inst/doc/DiffBind.pdf) was performed using the *DiffBind* package. Both narrow and broad peaks were analysed. Here we present results for broad peaks only, while narrow peak results are available for download in @sec-downloads. Significantly changing peaks were defined as those with FDR < `r params$fdr_limit` and |log2(FC)| > `r params$logfc_limit`.
+[Differential binding analysis](https://bioconductor.org/packages/release/bioc/vignettes/DiffBind/inst/doc/DiffBind.pdf) was performed using the *DiffBind* package. Only narrow peaks were analysed. Significantly changing peaks were defined as those with FDR < `r params$fdr_limit` and |log2(FC)| > `r params$logfc_limit`.
 
 
 ## Model with two factors
@@ -422,7 +433,7 @@ knitr::include_graphics("images/volcano_full_libs_narrow.png")
 
 ```{r}
 #| label: fig-up-down-full-libs-narrow
-#| fig-cap: Number of up- and down-regulated peaks for time point effect (iPS vs PSM) and treatment effect (control vs SETDB1 siRNA), using broad peaks.
+#| fig-cap: Number of up- and down-regulated peaks for time point effect (iPS vs PSM) and treatment effect (control vs SETDB1 siRNA), using narrow peaks.
 #| fig-width: 2.2
 #| fig-height: 4
 tar_read(fig_up_down_full_libs_narrow) 
@@ -451,7 +462,7 @@ The design included selected pairwise comparison between conditions.
 
 ```{r}
 #| label: fig-volcano-groups-libs-narrow
-#| fig-cap: Volcano plots for differential binding analysis using broad peaks, for pair-wise contrasts.
+#| fig-cap: Volcano plots for differential binding analysis using narrow peaks, for pair-wise contrasts.
 #| out.width: 100%
 knitr::include_graphics("images/volcano_groups_libs_narrow.png")
 ```
@@ -537,7 +548,7 @@ In this Section we report results per *RepeatMasker* family, with class name inc
 
 ```{r}
 #| label: fig-groups-rmsk-narrow
-#| fig-cap: RepeatMasker categories in broad peaks for the top 30,000 MACS peaks, per condition.
+#| fig-cap: RepeatMasker categories in narrow peaks for the top 30,000 MACS peaks, per condition.
 #| fig-width: 3.5
 #| fig-height: 4
 tar_read(fig_groups_rmsk_narrow)
@@ -565,7 +576,7 @@ A permutation test was performed to assess the statistical significance of the a
 
 ```{r}
 #| label: tbl-rmsk-stats
-#| tbl-cap: Percentage of *RepeatMasker* elements in a given family, containing at least one broad peak. RMF stands for *RepeatMasker* family. Only top 20 families are shown. The expected number of the RMF sequences containing a MACS peak and the corresponding p-values were calculated under the null hypothesis of the randomly distributed peaks and RM sequences, using a permutation test. Due to time constraints, tests with only 100 permutations were carried out, which resulted in the smallest possible p-value of 0.01. A p-value showing 0.01 constitutes an upper limit, so the actual p-values in these instances are likely smaller.
+#| tbl-cap: Percentage of *RepeatMasker* elements in a given family, containing at least one narrow peak. RMF stands for *RepeatMasker* family. Only top 20 families are shown. The expected number of the RMF sequences containing a MACS peak and the corresponding p-values were calculated under the null hypothesis of the randomly distributed peaks and RM sequences, using a permutation test. Due to time constraints, tests with only 100 permutations were carried out, which resulted in the smallest possible p-value of 0.01. A p-value showing 0.01 constitutes an upper limit, so the actual p-values in these instances are likely smaller.
 tb <- tar_read(tbl_rmsk_stats) |>  
   mutate(n_not_over = n_rmask - n_over)
 tot_rmask <- sum(tb$n_rmask)
@@ -598,7 +609,7 @@ tb |> mutate(
 
 There are hundreds of thousands of peaks detected in each condition (see @fig-peak-width). They cover a substantial portion of the genome, about 1% (see @{fig-peak-count}B). Searching for short motifs in tens of megabases of genome space would be futile - returning all possible motifs everywhere.
 
-Therefore, we decided to focus on strongly differentially binding peaks only for this exercise. *DiffBind* peaks with $FDR < 0.01$ and $|\log_2 FC| > 3$ using pairwise comparison were selected. This limits the search space to a few thousand peaks per contrast. DNA sequences for these peaks were extracted from the human genome used for mapping.
+Therefore, we decided to focus on strongly differentially binding peaks only for this exercise. *DiffBind* peaks with $FDR < 0.01$ and $|\log_2 FC| > 2$ using pairwise comparison were selected. This limits the search space to a few thousand peaks per contrast. DNA sequences for these peaks were extracted from the human genome used for mapping.
 
 ## Search for all motifs
 
@@ -626,7 +637,7 @@ tar_read(motif_stats_promoters) |>
 
 Short motifs are bound to appear everywhere and a list of all motifs in all peaks by itself is not informative. The next step involved motif enrichment. The function `enrich_motifs()` was used. It performs a Fisher's enrichment test for each motif, by comparing counts of the motif in the selection of peaks (significantly differentially bound) against a background.
 
-The background for the enrichment was selected carefully. A random selection of DNA fragments from the entire genome would not be specific enough to tell the difference between the peaks that are changing between the conditions versus those that do not change. Therefore, a background was selected from non-differentially bound peaks, by matching the distribution of length and GC content in 10 bins each. Specifically, consensus peaks across all conditions (present in at least 2 replicates) were used as the "universe". The GC content and the peak width of all changing peaks and the universe were divided into 10 bins each - 100 bind in total. The changing peaks were counted in each bin and the background was randomly selected from the universe (without the changing peaks) matching the number of peaks in each bin.
+The background for the enrichment was selected carefully. A random selection of DNA fragments from the entire genome would not be specific enough to tell the difference between the peaks that are changing between the conditions versus those that do not change. Therefore, a background was selected from non-differentially bound peaks, by matching the distribution of length and GC content in 10 bins each. Specifically, consensus peaks across all conditions (present in at least 2 replicates) were used as the "universe". The GC content and the peak width of all changing peaks and the universe were divided into 10 bins each - 100 bind in total. The changing peaks were counted in each bin and the background was randomly selected from the universe minus the changing peaks, matching the number of peaks in each bin.
 
 :::{.callout-note}
 
@@ -636,7 +647,7 @@ Motifs are not independent, as they form functionally similar groups, or multipl
 
 ```{r}
 #| label: tbl-motif-enrichment
-#| tbl-cap: Motif enrichment results for DB peaks with $FDR < 0.01$ and $|\log_2 FC| > 3$, in each contrast separately. Only motifs with q-value < 0.01 are shown.
+#| tbl-cap: Motif enrichment results for DB peaks with $FDR < 0.01$ and $|\log_2 FC| > 2$, in each contrast separately. Only motifs with q-value < 0.01 are shown.
 tar_read(tf_enr) |> 
   group_by(contrast_direction) |> 
   arrange(desc(target_enrichment)) |> 
@@ -664,6 +675,24 @@ tar_read(tf_enr) |>
 ```{r}
 #| label: load-cut-comparison
 tar_load(cmp_cut_atac)
+tar_load(cnt_over_cut_atac)
+```
+
+## Overlap between CUT&Tag and ATAC-seq
+
+@tbl-cnt-over-cut-atac shows the count of peaks in CUT&Tag, ATAC-seq and their overlap. Only about `r signif(100 * cnt_over_cut_atac$n_over / cnt_over_cut_atac$n_cut, 3)`% of CUT&Tag peaks overlap with ATAC-seq peaks.
+
+```{r}
+#| label: tbl-cnt-over-cut-atac
+#| tbl-cap: Count of overlaps between CUT&Tag and ATAC-seq peaks.
+cnt_over_cut_atac |> 
+  rename(`N CUT&Tag` = n_cut, `N ATAC-seq` = n_atac, `N Overlap` = n_over) |> 
+  gt() |> 
+  fmt_number(
+    columns = everything(),
+    decimals = 0,
+    use_seps = TRUE
+  )
 ```
 
 ## Significant peak counts

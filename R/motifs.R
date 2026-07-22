@@ -1,3 +1,11 @@
+#' Make a named DNAStringSet from peak sequences
+#'
+#' Converts a table of peak sequences into a `DNAStringSet` and names each
+#' sequence with its peak identifier.
+#'
+#' @param tb A data frame or tibble with `sequence` and `peak_id` columns.
+#'
+#' @return A `Biostrings::DNAStringSet` named by `peak_id`.
 make_dna_string_set <- function(tb) {
   s <- Biostrings::DNAStringSet(tb$sequence)
   names(s) <- paste0(tb$peak_id)
@@ -5,6 +13,19 @@ make_dna_string_set <- function(tb) {
 }
 
 
+#' Fetch genomic sequences for ranges
+#'
+#' Extracts sequences from a FASTA file for genomic ranges, reverse-complements
+#' sequences on the negative strand, and adds sequence width and GC content.
+#'
+#' @param fasta Path to an indexed FASTA file or an `Rsamtools::FaFile` object.
+#' @param ranges A data frame or tibble with `chr`, `start`, and `end` columns.
+#'   Optional `peak_id` values are used as sequence identifiers; if absent, they
+#'   are created from the genomic coordinates. Optional `strand` values are used
+#'   to orient sequences; missing or non-negative values are treated as `"+"`.
+#'
+#' @return A tibble containing the input ranges with `peak_id`, `strand`,
+#'   `sequence`, `width`, and `gc` columns.
 fetch_range_sequences <- function(fasta, ranges) {
   if(!"peak_id" %in% names(ranges)) {
     ranges <- ranges |>
@@ -60,6 +81,12 @@ fetch_range_sequences <- function(fasta, ranges) {
 }
 
 
+#' Get human vertebrate JASPAR CORE PWMs
+#'
+#' Loads the JASPAR2024 database, selects the latest human vertebrate CORE
+#' position weight matrices, and converts them to `universalmotif` objects.
+#'
+#' @return A list of `universalmotif` motif objects.
 get_jaspar_matrix <- function() {
   jaspar <- JASPAR2024::JASPAR2024()
   sq24 <- RSQLite::dbConnect(RSQLite::SQLite(), JASPAR2024::db(jaspar))
@@ -75,7 +102,21 @@ get_jaspar_matrix <- function() {
   universalmotif::convert_motifs(mtx)
 }
 
-# target_peaks should be filtered for statistically significant peaks
+#' Search target peaks for motif matches
+#'
+#' Extracts target peak sequences and scans them for motif matches using
+#' `universalmotif::scan_sequences()`. Target peaks should usually be filtered
+#' for statistically significant peaks before calling this function.
+#'
+#' @param target_peaks A data frame or tibble with `peak_id`, `chr`, `start`,
+#'   `end`, and `strand` columns.
+#' @param motifs A motif list compatible with `universalmotif::scan_sequences()`.
+#' @param genome_file Path to an indexed FASTA file or an `Rsamtools::FaFile`
+#'   object.
+#'
+#' @return A tibble of motif hits, sorted by motif FDR, with peak identifiers,
+#'   motif identifiers, match coordinates, strand, sequence, score, p-value, and
+#'   FDR columns.
 search_peaks_for_motifs <- function(target_peaks, motifs, genome_file) {
   
   targets <- target_peaks |>
@@ -115,6 +156,20 @@ search_peaks_for_motifs <- function(target_peaks, motifs, genome_file) {
 }
 
 
+#' Remove peaks overlapping target peaks
+#'
+#' Removes rows from a consensus peak set that overlap any target peak.
+#'
+#' @param consensus_peaks A data frame or tibble with `chr`, `start`, and `end`
+#'   columns.
+#' @param target_peaks A data frame or tibble with `chr`, `start`, and `end`
+#'   columns.
+#' @param minoverlap Minimum number of overlapping bases required to count as an
+#'   overlap. Default is 1.
+#' @param ignore.strand Logical; whether to ignore strand when finding overlaps.
+#'   Default is `TRUE`.
+#'
+#' @return `consensus_peaks` with overlapping rows removed.
 remove_overlapping_peaks <- function(consensus_peaks, target_peaks, minoverlap = 1L, ignore.strand = TRUE) {
   stopifnot(all(c("chr", "start", "end") %in% names(consensus_peaks)))
   stopifnot(all(c("chr", "start", "end") %in% names(target_peaks)))
@@ -132,6 +187,26 @@ remove_overlapping_peaks <- function(consensus_peaks, target_peaks, minoverlap =
   consensus_peaks[-unique(S4Vectors::queryHits(hits)), , drop = FALSE]
 }
 
+#' Make a GC- and width-matched background peak set
+#'
+#' Samples background peaks from a universe after stratifying target and universe
+#' peaks by width and GC-content bins.
+#'
+#' @param targets A data frame or tibble with `peak_id`, `chr`, `start`, `end`,
+#'   `strand`, `width`, and `gc` columns.
+#' @param universe A data frame or tibble with `peak_id`, `chr`, `start`, `end`,
+#'   `strand`, `width`, and `gc` columns.
+#' @param seed Random seed used for reproducible background sampling. Default is
+#'   42.
+#' @param width_bins Number of quantile bins to use for peak width. Default is
+#'   10.
+#' @param gc_bins Number of quantile bins to use for GC content. Default is 10.
+#' @param n_per_target Number of background peaks to sample per target peak
+#'   within each stratum. Default is 1.
+#'
+#' @return A list with `background`, the sampled background peaks, and
+#'   `diagnostics`, a tibble reporting available and sampled background counts
+#'   for each stratum.
 make_matched_background <- function(targets, universe, seed = 42,
                                     width_bins = 10, gc_bins = 10,
                                     n_per_target = 1) {
@@ -197,7 +272,29 @@ make_matched_background <- function(targets, universe, seed = 42,
 }
 
 
-# target_peaks should be filtered for statistically significant peaks
+#' Test motif enrichment in target peaks
+#'
+#' Runs motif enrichment for each contrast direction by comparing target peak
+#' sequences with a GC- and width-matched background. Target peaks should usually
+#' be filtered for statistically significant peaks before calling this function.
+#'
+#' @param target_peaks A data frame or tibble with `peak_id`, `chr`, `start`,
+#'   `end`, `strand`, and `contrast_direction` columns.
+#' @param consensus_seqs A data frame or tibble containing candidate background
+#'   peaks with `peak_id`, `chr`, `start`, `end`, `strand`, `width`, `gc`, and
+#'   `sequence` columns.
+#' @param genome_file Path to an indexed FASTA file or an `Rsamtools::FaFile`
+#'   object.
+#' @param motifs A motif list compatible with `universalmotif::enrich_motifs()`.
+#' @param min_target Minimum number of target peaks required to run enrichment
+#'   for a contrast. Default is 50.
+#' @param hit_qval_limit Motif-hit q-value threshold passed to
+#'   `universalmotif::enrich_motifs()`. Default is 0.01.
+#' @param enr_qval_limit Maximum enrichment q-value returned by
+#'   `universalmotif::enrich_motifs()`. Default is 0.01.
+#'
+#' @return A tibble of motif enrichment results for all contrasts that pass
+#'   `min_target`, with motif identifiers and a `contrast_direction` column.
 motif_enrichment <- function(target_peaks, consensus_seqs, genome_file, motifs, min_target = 50,
                              hit_qval_limit = 0.01, enr_qval_limit = 0.01) {
 

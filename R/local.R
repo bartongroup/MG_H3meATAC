@@ -352,7 +352,7 @@ annotation_fisher_example <- function(tst, annot = "Promoter", group = "48h_Ctrl
 
 
 # boths decs contain only significant peaks
-compare_atac_cut_ <- function(dec_atac, dec_cut) {
+compare_cut_atac_ <- function(dec_atac, dec_cut) {
   
   gr_atac <- GenomicRanges::makeGRangesFromDataFrame(dec_atac)
   tot_atac <- dec_atac |> 
@@ -373,7 +373,7 @@ compare_atac_cut_ <- function(dec_atac, dec_cut) {
       atac_hits <- S4Vectors::subjectHits(hits) |> unique()
 
       dec_atac[atac_hits, ] |> 
-        count(contrast_direction, name = "n_atac_cut") |> 
+        count(contrast_direction, name = "n_cut_atac") |> 
         add_column(cut_contrast = ctr) |> 
         left_join(tot_atac, by = "contrast_direction") |> 
         mutate(
@@ -389,7 +389,7 @@ compare_atac_cut_ <- function(dec_atac, dec_cut) {
 
 
 
-compare_atac_cut <- function(dec_atac, dec_cut) {
+compare_cut_atac <- function(dec_atac, dec_cut) {
   
   use_contrasts <- c(
     "48h_Ctrl-iPS_Ctrl_down",
@@ -416,9 +416,9 @@ compare_atac_cut <- function(dec_atac, dec_cut) {
       ) > 0
       
       d <- tibble(
-        n_atac_cut = sum(atac$sig & cut_overlap),
+        n_cut_atac = sum(atac$sig & cut_overlap),
         n_atac_ncut = sum(atac$sig & !cut_overlap),
-        n_natac_cut = sum(!atac$sig & cut_overlap),
+        n_ncut_atac = sum(!atac$sig & cut_overlap),
         n_natac_ncut = sum(!atac$sig & !cut_overlap)
       )
       
@@ -462,7 +462,7 @@ compare_atac_cut <- function(dec_atac, dec_cut) {
   mutate(fdr = p.adjust(p_value, method = "BH"))
 }
 
-get_atac_cut_overlaps <- function(dec_atac, dec_cut, ctr_atac, ctr_cut) {
+get_cut_atac_overlaps <- function(dec_atac, dec_cut, ctr_atac, ctr_cut) {
   cut <- dec_cut |> 
     filter(contrast == ctr_cut) |>
     mutate(idx = row_number())
@@ -480,3 +480,22 @@ get_atac_cut_overlaps <- function(dec_atac, dec_cut, ctr_atac, ctr_cut) {
     left_join(atac, by = join_by(queryHits == idx)) |> 
     left_join(cut, by = join_by(subjectHits == idx), suffix = c("_atac", "_cut"))
 }
+
+count_cut_atac_overlaps <- function(dec_atac, dec_cut) {
+  cut <- dec_cut |> 
+    distinct(chr, start, end, strand)
+  atac <- dec_atac |> 
+    distinct(chr, start, end, strand)
+  over <- GenomicRanges::findOverlaps(
+    query = GenomicRanges::makeGRangesFromDataFrame(atac),
+    subject = GenomicRanges::makeGRangesFromDataFrame(cut),
+    ignore.strand = TRUE
+  )
+
+  tibble(
+    n_cut = nrow(cut),
+    n_atac = nrow(atac),
+    n_over = length(over)
+  )
+}
+

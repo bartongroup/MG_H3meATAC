@@ -162,6 +162,27 @@ plot_up_down <- function(dec, fdr_limit = 0.01, logfc_limit = 0) {
   })
 }
 
+plot_pca <- function(db, meta) {
+  mat <- extract_bindings(db) |> 
+    pivot_wider(names_from = sample, values_from = value) |>
+    column_to_rownames("peak_id") |>
+    as.matrix()
+
+  pca <- prcomp(t(log2(mat + 1)), scale. = TRUE)
+
+  env <- new.env(parent = globalenv())
+  env$pca_df <- as_tibble(pca$x[, 1:2], rownames = "sample") |>
+    left_join(meta, by = "sample")
+
+  with(env, {
+    pca_df |> 
+      ggplot(aes(x = PC1, y = PC2, colour = group, shape = replicate)) +
+      th() +
+      geom_point(size = 3) +
+      scale_colour_manual(values = okabe_ito_palette)
+  })
+}
+
 plot_de_peak_distribution <- function(dec, chrom_sizes, fdr_limit = 0.01, chromosomes = c(1:22, "X", "Y")) {
   cs <- chrom_sizes |> 
     filter(chr != "MT") |> 

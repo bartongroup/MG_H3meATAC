@@ -176,7 +176,7 @@ targets_main <- function() {
   # This is done only for ChIPseeker, differential binding in pair-wise comparison significant genes,
   # lib-size normalisation, narrow peaks
   motif_analysis <- tar_plan(
-    dec_for_motifs = dec_chipseeker_sig_groups_libs_narrow |> dplyr::filter(abs(log_fc) > 3),
+    dec_for_motifs = dec_chipseeker_sig_groups_libs_narrow |> dplyr::filter(abs(log_fc) > 2),
     n_peaks_for_motifs = nrow(dec_for_motifs),
     consensus_peaks =  extract_consensus(db_libs_narrow),
     consensus_seqs = fetch_range_sequences(genome_file, consensus_peaks),
@@ -200,9 +200,10 @@ targets_main <- function() {
   cuttag_comparison <- tar_plan(
     dec_cut = readr::read_rds("cache/dec_cut.rds") |> dplyr::mutate(sig = fdr < 0.01 & abs(log_fc) > 0.58),
     dec_atac = dec_chipseeker_groups_libs_narrow |> dplyr::mutate(sig = fdr < 0.01 & abs(log_fc) > 1),
-    cmp_cut_atac = compare_atac_cut(dec_atac, dec_cut),
-    over_cut_atac_ctrl = get_atac_cut_overlaps(dec_atac, dec_cut, "48h_Ctrl-iPS_Ctrl", "48h_Ctrl-iPS_Ctrl"),
-    over_cut_atac_set = get_atac_cut_overlaps(dec_atac, dec_cut, "48h_SETDB1-iPS_SETDB1", "48h_SETDB1-iPS_SETDB1"),
+    cnt_over_cut_atac = count_cut_atac_overlaps(dec_atac, dec_cut),
+    cmp_cut_atac = compare_cut_atac(dec_atac, dec_cut),
+    over_cut_atac_ctrl = get_cut_atac_overlaps(dec_atac, dec_cut, "48h_Ctrl-iPS_Ctrl", "48h_Ctrl-iPS_Ctrl"),
+    over_cut_atac_set = get_cut_atac_overlaps(dec_atac, dec_cut, "48h_SETDB1-iPS_SETDB1", "48h_SETDB1-iPS_SETDB1"),
     fig_over_cut_atac_fcfc_ctrl = plot_cut_atac_fcfc(over_cut_atac_ctrl),
     fig_over_cut_atac_fcfc_set = plot_cut_atac_fcfc(over_cut_atac_set)
 
@@ -210,6 +211,7 @@ targets_main <- function() {
  
 
   for_report <- tar_plan(
+    fig_pca = plot_pca(db_libs_narrow, metadata),
     fig_all_biotype = plot_all_genes_biotype(),
 
     tbl_rmsk_peaks =  annotate_peaks_rmsk(consensus_peaks, rmsk),
@@ -229,7 +231,7 @@ targets_main <- function() {
     fig_de_peak_example_1 = plot_region_ggbio_peak_id(dec_ctr, "8:37374556-37375887", config, metadata, peaks_narrow = peaks_narrow, normfac = normfac |> dplyr::mutate(norm = libs_norm)),
 
     smpls = metadata |> filter(treatment == "Ctrl" ) |> pull(sample) |> as.character(),
-    png_atac_cut_example = plot_region_ggbio(smpls, config, metadata, make_region(18, 69935096, 69935793), peaks_broad = NULL, peaks_narrow = peaks_narrow) |> gs("atac_cut_example", width = 8, height = 8),
+    png_cut_atac_example = plot_region_ggbio(smpls, config, metadata, make_region(18, 69935096, 69935793), peaks_broad = NULL, peaks_narrow = peaks_narrow) |> gs("cut_atac_example", width = 8, height = 8),
 
     normfac = tibble::tibble(
       sample = db_libs_narrow$samples$SampleID,
