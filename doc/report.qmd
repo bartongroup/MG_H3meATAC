@@ -647,11 +647,11 @@ Motifs are not independent, as they form functionally similar groups, or multipl
 
 ```{r}
 #| label: tbl-motif-enrichment
-#| tbl-cap: Motif enrichment results for DB peaks with $FDR < 0.01$ and $|\log_2 FC| > 2$, in each contrast separately. Only motifs with q-value < 0.01 are shown.
+#| tbl-cap: Motif enrichment results for DB peaks with $FDR < 0.01$ and $|\log_2 FC| > 2$, in each contrast separately. Only motifs with q-value < 0.01 are shown. `Np` indicates the number of peaks with the motif detected, in targets and background.
 tar_read(tf_enr) |> 
   group_by(contrast_direction) |> 
   arrange(desc(target_enrichment)) |> 
-  select(Motif = motif_name, Consensus = motif_consensus, `N target` = target_hits, `N background` = bkg_hits, `Enrichment` = target_enrichment) |> 
+  select(Motif = motif_name, Consensus = motif_consensus, `Np target` = target_seq_hits, `Np background` = bkg_seq_hits, `Enrichment` = target_enrichment) |> 
   gt() |> 
   fmt_number(columns = Enrichment, n_sigfig = 3)
 ```

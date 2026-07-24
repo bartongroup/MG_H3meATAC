@@ -192,7 +192,7 @@ targets_main <- function() {
     motif_stats_promoters = get_motif_stats(dec_tf_scan |> dplyr::filter(annotation == "Promoter"), dec_for_motifs |> dplyr::filter(annotation == "Promoter")),
 
     # Motif enrichment
-    tf_enr = motif_enrichment(dec_for_motifs, consensus_seqs, genome_file, tf_motifs),
+    tf_enr = motif_enrichment(dec_for_motifs, consensus_seqs, genome_file, tf_motifs, min_target = 10),
     tf_comb = dplyr::left_join(tf_enr, dec_tf_scan,  by = dplyr::join_by(motif_name, motif_id, contrast_direction), relationship = "many-to-many")
   )
 

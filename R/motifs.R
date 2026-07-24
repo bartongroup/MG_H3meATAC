@@ -306,7 +306,7 @@ motif_enrichment <- function(target_peaks, consensus_seqs, genome_file, motifs, 
     targets <- all_targets |> 
       filter(contrast_direction == ctr)
     if(nrow(targets) < min_target) {
-      message("Not enough targets. Skipping contrast: ", ctr)
+      message("Not enough targets ", nrow(targets), ". Skipping contrast: ", ctr)
       return(NULL)
     }
 
