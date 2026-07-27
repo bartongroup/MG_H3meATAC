@@ -163,7 +163,9 @@ plot_up_down <- function(dec, fdr_limit = 0.01, logfc_limit = 0) {
 }
 
 plot_pca <- function(db, meta) {
+  ms <- meta |> distinct(sample)
   mat <- extract_bindings(db) |> 
+    right_join(ms, by = join_by(sample)) |> 
     pivot_wider(names_from = sample, values_from = value) |>
     column_to_rownames("peak_id") |>
     as.matrix()
@@ -639,9 +641,9 @@ plot_all_genes_biotype <- function() {
 } 
 
 
-get_pileup_from_peaks <- function(pks, max_dist) {
-  regions <- pks |> 
-    distinct(grp, start, end, gene_start, distance_to_tss, gene_strand) |> 
+get_rel_start_end <- function(pks, max_dist) {
+  pks |> 
+    distinct(grp, start, end, gene_start, distance_to_tss, gene_strand, score) |> 
     mutate(
       rel_start = if_else(gene_strand == 1, start - gene_start, gene_start - end),
       rel_end = if_else(gene_strand == 1, end - gene_start, gene_start - start)
@@ -649,7 +651,15 @@ get_pileup_from_peaks <- function(pks, max_dist) {
     filter(rel_start <= max_dist, rel_end >= -max_dist) |>
     mutate(
       rel_start = pmax(rel_start, -max_dist),
-      rel_end   = pmin(rel_end, max_dist),
+      rel_end   = pmin(rel_end, max_dist)
+    )
+}
+
+
+get_pileup_from_peaks <- function(pks, max_dist) {
+  regions <- pks |> 
+    get_rel_start_end(max_dist) |> 
+    mutate(
       end_event = rel_end + 1L
     )
  
@@ -668,6 +678,32 @@ get_pileup_from_peaks <- function(pks, max_dist) {
 
   pileup
 }
+
+
+get_matrix_from_peaks <- function(pks, max_dist, n_top) {
+  regions <- pks |> 
+    get_rel_start_end(max_dist) |> 
+    group_by(grp) |> 
+    slice_max(score, n = n_top) |> 
+    mutate(
+      y = rank(-score, ties.method = "random"),
+      score = score / max(score)
+    ) |> 
+    ungroup()
+
+  peak_tiles <- regions |> 
+    transmute(grp, value = score, y, x = map2(rel_start, rel_end, seq)) |> 
+    unnest(x) 
+
+  regions |> 
+    distinct(grp, y) |> 
+    crossing(x = -max_dist:max_dist) |> 
+    left_join(peak_tiles, by = join_by(grp, y, x)) |> 
+    mutate(value = replace_na(value, 0L)) |> 
+    arrange(grp, y, x)
+}
+
+
 
 plot_peaks_tss <- function(pks, rand_an = NULL, max_dist = 3000, ncol = 4, group_var = "group") {
 
@@ -734,4 +770,79 @@ plot_cut_atac_fcfc <- function(over_cut_atac) {
     geom_hline(yintercept = 0, colour = "grey40") +
     geom_vline(xintercept = 0, colour = "grey40") +
     labs(x = "Log2 Fold Change (ATAC)", y = "Log2 Fold Change (Cut)")
+}
+
+plot_peaks_cut_atac_tss <- function(cut, atac, max_dist = 3000, n_top = 300) {
+
+  pileup_cut <- get_pileup_from_peaks(cut |> add_column(grp = "Cut"), max_dist)
+  pileup_atac <- get_pileup_from_peaks(atac |> add_column(grp = "ATAC"), max_dist)
+  pileup <- bind_rows(pileup_cut, pileup_atac) |> 
+    mutate(
+      pos = pos / 1000,
+      coverage = coverage / 1000
+    )
+  
+  m_cut <- cut |> 
+    group_by(start, end, gene_start, distance_to_tss, gene_strand) |> 
+    summarise(score = max(score), .groups = "drop")
+  m_atac <- atac |> 
+    group_by(start, end, gene_start, distance_to_tss, gene_strand) |> 
+    summarise(score = max(score), .groups = "drop")
+  
+  pks <- bind_rows(m_cut |> add_column(grp = "Cut"), m_atac |> add_column(grp = "ATAC"))
+  peak_matrix <- get_matrix_from_peaks(pks, max_dist, n_top)
+
+  env <- new.env(parent = globalenv())
+  env$pileup <- pileup
+  env$peak_matrix <- peak_matrix
+  env$ncol <- ncol
+  
+  with(env, {
+    pl1 <- pileup |>
+      ggplot(aes(x = pos, y = coverage)) +
+      th() +
+      geom_vline(xintercept = 0, color = "brown", alpha = 0.3) +
+      geom_step() +
+      scale_x_continuous(expand = c(0, 0)) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.04)), limits = c(0, NA)) +
+      facet_wrap(~grp, scales = "fixed", ncol = 2) +
+      labs(x = NULL, y = "Coverage (x1000)")
+    pl2 <- peak_matrix |>
+      ggplot(aes(x = x / 1000, y = y, fill = log(value))) +
+      th() +
+      theme(legend.position = "none") +
+      geom_tile() +
+      geom_vline(xintercept = 0, color = "grey40") +
+      scale_fill_distiller(palette = "Purples", direction = 1, na.value = "white") +
+      scale_x_continuous(expand = c(0, 0)) +
+      scale_y_reverse(expand = c(0, 0)) +
+      facet_wrap(~grp, scales = "fixed", ncol = 2) +
+      labs(x = "Position relative to TSS (kB)", y = "Top peaks")
+    plot_grid(pl1, pl2, ncol = 1, align = "v", rel_heights = c(1, 2))
+  })
+
+}
+
+
+
+plot_enr_contrasts_logp <- function(tf_enr, ctr1, ctr2, margin = 5) {
+  d <- tf_enr |> 
+    mutate(lp = -log10(pval)) |>
+    filter(contrast_direction %in% c(ctr1, ctr2)) 
+  #mn <- min(d$lp, na.rm = TRUE) - margin
+  mn <- 0
+  d |> 
+    pivot_wider(id_cols = c(motif_name, motif_consensus), names_from = contrast_direction, values_from = lp) |> 
+    rename(x = !!sym(ctr1), y = !!sym(ctr2)) |> 
+    mutate(
+      mrg = is.na(x) | is.na(y),
+      across(x:y, ~replace_na(.x, mn))
+    ) |>  
+    ggplot(aes(x = x, y = y, shape = mrg)) +
+    th() +
+    theme(legend.position = "none") +
+    geom_point() +
+    ggrepel::geom_text_repel(aes(label = motif_name), size = 3) +
+    scale_shape_manual(values = c(16, 1)) +
+    labs(x = str_glue("-log10 P ({ctr1})"), y = str_glue("-log10 P ({ctr2})"))
 }

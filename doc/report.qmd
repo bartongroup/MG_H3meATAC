@@ -378,6 +378,17 @@ In order to create a PCA plot for peak data, consensus peaks present in at least
 tar_read(fig_pca) 
 ```
 
+```{r}
+#| label: fig-pca-time
+#| fig-cap: PCA plot for consensus peak data split into iPS and 48h.
+#| fig-width: 8
+#| fig-height: 3.5
+pl1 <- tar_read(fig_pca_ips)
+pl2 <- tar_read(fig_pca_48)
+plot_grid(pl1, pl2, nrow = 1, labels = c("iPS", "48h")) 
+```
+
+
 ## Peak annotations
 
 We used to different packages to annotate peaks: *annotatr* and *ChIPseeker*. Both packages use different approaches and different genomic features for annotation. In particular, *ChIPseeker* includes intergenic regions, while *annotatr* does not. Also, *ChIPseeker* removes redundant hits (peak spanning multiple features, e.g. promoter-exon-intron; parallel annotations from alternative transcripts), while *annotatr* provides all redundant hits, including all hits from all transcripts. To make results more comparable, *annotatr* results were reduced by using canonical transcripts only.
@@ -669,6 +680,17 @@ tar_read(tf_enr) |>
   gt()
 ```
 
+@fig-enr-contrast-logp compares p-values between two pairs of contrasts. Open symbols indicate motifs detected in one contrast only. Please note that in both panels the single-contrast motifs are at the lower end of -log(P), suggesting they could be detected in one contrast and not the other simply because of limited statistics, and not because they do not exist in the other contrast.
+
+```{r}
+#| label: fig-enr-contrast-logp
+#| fig-cap: Comparison of the p-values for motif enrichment, between two pairs of contrasts. Open symbols indicate motifs detected in only one contrast.
+#| fig-width: 8
+#| fig-height: 16
+pl1 <- tar_read(fig_enr_contrasts_logp_up)
+pl2 <- tar_read(fig_enr_contrasts_logp_down)
+plot_grid(pl1, pl2, ncol = 1) 
+```
 
 # Comparison to CUT&Tag experiment
 
@@ -694,6 +716,18 @@ cnt_over_cut_atac |>
     use_seps = TRUE
   )
 ```
+
+## Peak profiles
+
+@fig-peaks-cut-atac-tss shows the average pileup profile of all peaks in ATAC-seq and CUT&Tag experiments, around the TSS of all annotated genes. The lower panels show the location and score of the top 300 peaks (by MACS score). 
+
+```{r}
+#| label: fig-peaks-cut-atac-tss
+#| fig-cap: Peak profiles for all CUT&Tag and ATAC-seq data, aggregated from all conditions, based on MACS-detected peak coordinates. The bottom panels show the top 300 peaks (by MACS score) in each experiment. The colour shows the logarithm of the normalised score - the darker shade corresponds to the higher score.
+#| out.width: "100%"
+knitr::include_graphics("images/cut_atac_peaks.png")  
+```
+
 
 ## Significant peak counts
 

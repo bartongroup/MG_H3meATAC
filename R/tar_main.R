@@ -193,11 +193,16 @@ targets_main <- function() {
 
     # Motif enrichment
     tf_enr = motif_enrichment(dec_for_motifs, consensus_seqs, genome_file, tf_motifs, min_target = 10),
-    tf_comb = dplyr::left_join(tf_enr, dec_tf_scan,  by = dplyr::join_by(motif_name, motif_id, contrast_direction), relationship = "many-to-many")
+    tf_comb = dplyr::left_join(tf_enr, dec_tf_scan,  by = dplyr::join_by(motif_name, motif_id, contrast_direction), relationship = "many-to-many"),
+
+    fig_enr_contrasts_logp_down = plot_enr_contrasts_logp(tf_enr, ctr1 = "48h_Ctrl-iPS_Ctrl_down", ctr2 = "48h_SETDB1-iPS_SETDB1_down"),
+    fig_enr_contrasts_logp_up = plot_enr_contrasts_logp(tf_enr, ctr1 = "48h_Ctrl-iPS_Ctrl_up", ctr2 = "48h_SETDB1-iPS_SETDB1_up")
   )
 
 
   cuttag_comparison <- tar_plan(
+    peaks_cut = readr::read_rds("cache/peaks_cut.rds"),
+
     dec_cut = readr::read_rds("cache/dec_cut.rds") |> dplyr::mutate(sig = fdr < 0.01 & abs(log_fc) > 0.58),
     dec_atac = dec_chipseeker_groups_libs_narrow |> dplyr::mutate(sig = fdr < 0.01 & abs(log_fc) > 1),
     cnt_over_cut_atac = count_cut_atac_overlaps(dec_atac, dec_cut),
@@ -205,13 +210,16 @@ targets_main <- function() {
     over_cut_atac_ctrl = get_cut_atac_overlaps(dec_atac, dec_cut, "48h_Ctrl-iPS_Ctrl", "48h_Ctrl-iPS_Ctrl"),
     over_cut_atac_set = get_cut_atac_overlaps(dec_atac, dec_cut, "48h_SETDB1-iPS_SETDB1", "48h_SETDB1-iPS_SETDB1"),
     fig_over_cut_atac_fcfc_ctrl = plot_cut_atac_fcfc(over_cut_atac_ctrl),
-    fig_over_cut_atac_fcfc_set = plot_cut_atac_fcfc(over_cut_atac_set)
+    fig_over_cut_atac_fcfc_set = plot_cut_atac_fcfc(over_cut_atac_set),
 
+    png_peaks_cut_atac_tss = plot_peaks_cut_atac_tss(peaks_cut, peaks_chipseeker_narrow, n_top = 300) |> gs("cut_atac_peaks", 8, 12)
   )
  
 
   for_report <- tar_plan(
     fig_pca = plot_pca(db_libs_narrow, metadata),
+    fig_pca_ips = plot_pca(db_libs_narrow, metadata |> filter(time_point == 'iPS')),
+    fig_pca_48 = plot_pca(db_libs_narrow, metadata |> filter(time_point == '48h')),
     fig_all_biotype = plot_all_genes_biotype(),
 
     tbl_rmsk_peaks =  annotate_peaks_rmsk(consensus_peaks, rmsk),
