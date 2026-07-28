@@ -515,7 +515,7 @@ question_1 <- function(dec_atac, dec_cut) {
   d_cut <- dec_cut |> 
     filter(contrast == "48h_SETDB1-48h_Ctrl")
   ov <- get_peak_overlaps(d_atac, d_cut) |> 
-    select(peak_id_atac, log_fc_atac, fdr_atac, sig_atac, log_fc_cut, fdr_cut, sig_cut) |>
+    select(peak_id_atac, log_fc_atac, fdr_atac, sig_atac, log_fc_cut, fdr_cut, sig_cut, gene_id, gene_symbol, gene_name) |>
     arrange(fdr_cut)
 }
 
