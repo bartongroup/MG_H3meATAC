@@ -819,39 +819,16 @@ plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
 
 ## Interactive data explorers {#sec-explorers}
 
-- [Differential expression](https://shiny.compbio.dundee.ac.uk/mgierlinski/private/h3mecut/de)
+- [Differential expression](https://shiny.compbio.dundee.ac.uk/mgierlinski/private/h3meatac/de)
 
 
 ## Downloads {#sec-downloads}
 
-```{r}
-#| label: tbl-downloads
-#| tbl-cap: Annotated differential abundance results
-expand_grid(
-  norm = c("libs"),
-  type = c("broad"),
-  model = c("full", "groups")
-) |> 
-  unite(name, c(model, norm, type), remove = FALSE) |>
-  mutate(link = str_glue("[link](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3mecut/tab/diffbind_chipseeker_{name}.csv)")) |> 
-  select(-name) |> 
-  mutate(
-    Normalisation = recode_values(norm, "libs" ~ "Library size", "spike" ~ "Spike-in"),
-    `Peak type` = recode_values(type, "broad" ~ "Broad", "narrow" ~ "Narrow"),
-    `DE model` = recode_values(model, "full" ~ "Two factors", "groups" ~ "Separate contrasts")
-  ) |> 
-  select(-c(norm, type, model)) |> 
-  relocate(link, .after = 4) |> 
-  gt() |> 
-  fmt_markdown(columns = link)
-```
-
- - [Repeat Masker - consensus peaks mapping](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3mecut/tab/rmask_peaks.csv)
-
+ 
 ## Code
 
 All analysis in this report has been done in R. The source code can be
-found on [GitHub](https://github.com/bartongroup/MG_H3meCut).
+found on [GitHub](https://github.com/bartongroup/MG_H3meATAC).
 
 
 

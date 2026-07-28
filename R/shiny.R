@@ -37,7 +37,8 @@ map_peak_to_gene <- function(dbc) {
 }
 
 make_dbc_annotations <- function(p2g, terms) {
-  ontologies <- names(terms)
+  #ontologies <- names(terms)
+  ontologies <- "go" # Somehow they are huge, keeping just GO for the moment
   pterms <- map(ontologies, function(ont) {
     maps <- p2g |> 
       inner_join(terms[[ont]]$mapping |> rename(gene_id = id), by = join_by(gene_id), relationship = "many-to-many") |> 
@@ -52,7 +53,7 @@ make_dbc_annotations <- function(p2g, terms) {
   prepare_terms_fenr(pterms)
 }
 
-prepare_for_shiny <- function(dbc_full_libs_broad, dbc_full_spike_broad, dbc_groups_libs_broad, dbc_groups_spike_broad,
+prepare_for_shiny <- function(dbc_full_libs_broad, dbc_groups_libs_broad,
                               meta, terms, gns) {
 
   # Peak positions and IDs are the same in all sets
@@ -70,9 +71,7 @@ prepare_for_shiny <- function(dbc_full_libs_broad, dbc_full_spike_broad, dbc_gro
  
   dexset <- dexdash::dexdash_list(
     make_dbc_dexdash(dbc_full_libs_broad, meta, "Full libsize"),
-    make_dbc_dexdash(dbc_full_spike_broad, meta, "Full spikein"),
-    make_dbc_dexdash(dbc_groups_libs_broad, meta, "Pairs libsize"),
-    make_dbc_dexdash(dbc_groups_spike_broad, meta, "Pairs spikein")
+    make_dbc_dexdash(dbc_groups_libs_broad, meta, "Pairs libsize")
   )
 
   write_shiny_file(dexset)

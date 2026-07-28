@@ -1,0 +1,10 @@
+{
+  "title" : "H3K9me3 CUT&Tag",
+  "data_path" : "../data",
+  "max_points" : 3000,
+  "file_names" : {
+    "dexset": "dexset.qs",
+    "features": "features.qs",
+    "fterms": "fterms.qs"
+  }
+}

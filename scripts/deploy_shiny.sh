@@ -1,1 +1,1 @@
-rsync -rvm shiny/* shiny:/cluster/gjb_lab/mgierlinski/ShinyApps/private/h3meatac
+rsync -rvm shiny/* shiny:/home/mgierlinski/ShinyApps/private/h3meatac

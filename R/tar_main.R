@@ -273,8 +273,7 @@ targets_main <- function() {
   )
 
   for_shiny <- tar_plan(
-    #sav_shiny = prepare_for_shiny(dbc_full_libs_narrow, dbc_full_spike_narrow, dbc_groups_libs_narrow, dbc_groups_spike_narrow,
-    #                              metadata, terms, gns)
+    sav_shiny = prepare_for_shiny(dbc_full_libs_narrow, dbc_groups_libs_narrow, metadata, terms, gns)
   )
 
 
@@ -297,9 +296,9 @@ targets_main <- function() {
     map_diffbind,
     motif_analysis,
     cuttag_comparison,
-    for_report
+    for_report,
     #for_manuscript,
-    #for_shiny
+    for_shiny
   )
   
 }

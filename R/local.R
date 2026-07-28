@@ -462,23 +462,30 @@ compare_cut_atac <- function(dec_atac, dec_cut) {
   mutate(fdr = p.adjust(p_value, method = "BH"))
 }
 
-get_cut_atac_overlaps <- function(dec_atac, dec_cut, ctr_atac, ctr_cut) {
-  cut <- dec_cut |> 
-    filter(contrast == ctr_cut) |>
-    mutate(idx = row_number())
-  atac <- dec_atac |> 
-    filter(contrast == ctr_atac) |>
-    mutate(idx = row_number())
+get_peak_overlaps <- function(pks1, pks2, suffix1 = "_atac", suffix2 = "_cut") {
+
+  pks1 <- pks1 |> mutate(idx = row_number())
+  pks2 <- pks2 |> mutate(idx = row_number())
   over <- GenomicRanges::findOverlaps(
-    query = GenomicRanges::makeGRangesFromDataFrame(atac),
-    subject = GenomicRanges::makeGRangesFromDataFrame(cut),
+    query = GenomicRanges::makeGRangesFromDataFrame(pks1),
+    subject = GenomicRanges::makeGRangesFromDataFrame(pks2),
     ignore.strand = TRUE
   )
 
   over |> 
     as_tibble() |> 
-    left_join(atac, by = join_by(queryHits == idx)) |> 
-    left_join(cut, by = join_by(subjectHits == idx), suffix = c("_atac", "_cut"))
+    left_join(pks1, by = join_by(queryHits == idx)) |> 
+    left_join(pks2, by = join_by(subjectHits == idx), suffix = c(suffix1, suffix2))
+}
+
+
+get_cut_atac_overlaps <- function(dec_atac, dec_cut, ctr_atac, ctr_cut) {
+  cut <- dec_cut |> 
+    filter(contrast == ctr_cut)
+  atac <- dec_atac |> 
+    filter(contrast == ctr_atac)
+ 
+  get_peak_overlaps(atac, cut)
 }
 
 count_cut_atac_overlaps <- function(dec_atac, dec_cut) {
@@ -499,3 +506,29 @@ count_cut_atac_overlaps <- function(dec_atac, dec_cut) {
   )
 }
 
+# Do the promoters that gain accessibility upon SETDB1 depletion
+# (in contrast 48h_SETDB1-48h_Ctrl_up) loose accessibility upon SETDB1
+# depletion in CUT&Tag?
+question_1 <- function(dec_atac, dec_cut) {
+  d_atac <- dec_atac |> 
+    filter(contrast_direction == "48h_SETDB1-48h_Ctrl_up" & sig & annotation == "Promoter")
+  d_cut <- dec_cut |> 
+    filter(contrast == "48h_SETDB1-48h_Ctrl")
+  ov <- get_peak_overlaps(d_atac, d_cut) |> 
+    select(peak_id_atac, log_fc_atac, fdr_atac, sig_atac, log_fc_cut, fdr_cut, sig_cut) |>
+    arrange(fdr_cut)
+}
+
+# Do LTR rmasker regions that gain accessibility upon SETDB1 depletion
+# (in contrast 48h_SETDB1-48h_Ctrl_up) loose accessibility upon SETDB1
+# depletion in CUT&Tag?
+question_2 <- function(dec_rmsk_groups_libs_narrow, dec_cut) {
+  d_atac <- dec_rmsk_groups_libs_narrow |> 
+    mutate(sig = fdr < 0.01 & abs(log_fc) > 1) |> 
+    filter(contrast_direction == "48h_SETDB1-48h_Ctrl_up" & sig & rep_category == "LTR")
+  d_cut <- dec_cut |> 
+    filter(contrast == "48h_SETDB1-48h_Ctrl")
+  ov <- get_peak_overlaps(d_atac, d_cut) |> 
+    select(peak_id_atac, log_fc_atac, fdr_atac, sig_atac, log_fc_cut, fdr_cut, sig_cut) |>
+    arrange(fdr_cut)
+}
