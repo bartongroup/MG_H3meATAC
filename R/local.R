@@ -532,3 +532,53 @@ question_2 <- function(dec_rmsk_groups_libs_narrow, dec_cut) {
     select(peak_id_atac, log_fc_atac, fdr_atac, sig_atac, log_fc_cut, fdr_cut, sig_cut) |>
     arrange(fdr_cut)
 }
+
+# Look at motifs that are enriched in 48h_Ctrl-48h_Ctrl_up.
+# Is there a change in CUT&Tag level for these motifs in 48h_Ctrl-48h_Ctrl?
+# In other words, does the opening of a motif target regions coincide with loss of H3K9me3?
+question_3 <- function(tf_enr, tf_scan, dec_cut) {
+  scn <- tf_scan |> 
+    filter(motif_fdr < 0.01) |> 
+    distinct(motif_id, peak_id) |> 
+    separate_wider_delim(peak_id, delim = ":", names = c("chr", "startend"), cols_remove = FALSE)  |> 
+    separate_wider_delim(startend, delim = "-", names = c("start", "end"), cols_remove = TRUE) |> 
+    mutate(start = as.integer(start), end = as.integer(end)) 
+  enr <- tf_enr |>
+    filter(contrast_direction == "48h_Ctrl-iPS_Ctrl_up") |> 
+    select(motif_id, motif_name, motif_consensus, target_enrichment) |> 
+    inner_join(scn, by = join_by(motif_id)) |> 
+    group_by(motif_consensus, chr, start, end, peak_id) |> 
+    summarise(motif_name = str_c(sort(motif_name), collapse = ";"), target_enrichment = mean(target_enrichment), .groups = "drop")
+  d_cut <- dec_cut |> 
+    filter(contrast == "48h_Ctrl-iPS_Ctrl")
+  ov <- get_peak_overlaps(enr, d_cut) |> 
+     select(motif_name, motif_consensus, target_enrichment, peak_id_atac, peak_id_cut, log_fc_cut = log_fc, p_value_cut = p_value, fdr_cut = fdr, sig_cut = sig) |> 
+     arrange(fdr_cut)
+}
+
+plot_question_3 <- function(ov, dec_cut) {
+  M <- median(dec_cut$log_fc)
+  md <- ov |> 
+    group_by(motif_name) |> 
+    summarise(m = mean(log_fc_cut), .groups = "drop") |> 
+    mutate(motif_name = fct_reorder(motif_name, m))
+  ov |>
+    mutate(motif_name = factor(motif_name, levels = levels(md$motif_name))) |>
+    ggplot(aes(x = log_fc_cut, y = motif_name, colour = sig_cut)) +
+    th() +
+    theme(legend.position = "none") +
+    geom_quasirandom() +
+    #stat_summary(fun = mean, geom = "crossbar", orientation = "y", linewidth = 3, colour = "red") +
+    stat_summary(fun = mean, geom = "point", shape = 124, size = 6, colour = "red") +
+    geom_vline(xintercept = 0, colour = "brown", alpha = 0.3) +
+    scale_colour_manual(values = c("grey70", "black")) +
+    labs(x = "log2FC in CUT&Tag (48h_Ctrl-iPS_Ctrl)", y = "Motif name")
+}
+
+# Identify genes whose promoters show changes in accessibility in ATAC&seq.
+question_4 <- function(dec_chipseeker_groups_libs_narrow) {
+  dec_chipseeker_groups_libs_narrow |> 
+    filter(fdr < 0.01 & abs(log_fc) > 1 & annotation == "Promoter") |>
+    distinct(contrast, log_fc, gene_symbol, gene_name, gene_biotype) |> 
+    arrange(contrast, log_fc)
+}

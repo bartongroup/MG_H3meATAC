@@ -4,7 +4,7 @@ suppressPackageStartupMessages({
   library(qs2)
 })
 
-required_packages <- read.delim("R/packages.txt", header = FALSE, col.names = "name")$name
+required_packages <- read.delim("packages.txt", header = FALSE, col.names = "name")$name
 tar_option_set(packages = required_packages, format = "qs")
 options(tidyverse.quiet = TRUE, dplyr.summarise.inform = FALSE)
 
@@ -15,8 +15,7 @@ for (d in c("tab", "fig", "doc", "doc/images", "cache")) if (!dir.exists(d)) dir
 if (interactive()) sapply(required_packages, library, character.only = TRUE)
 
 # Source all functions from .R files
-files_R <- list.files(c("R", "targets"), pattern = "*.R$", full.names = TRUE)
-sr_ <- sapply(files_R, source)
+tar_source("R")
 
 sesinfo <- list(
   tar_target(session_info, sessionInfo())
