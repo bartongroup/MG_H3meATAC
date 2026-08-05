@@ -536,24 +536,59 @@ question_2 <- function(dec_rmsk_groups_libs_narrow, dec_cut) {
 # Look at motifs that are enriched in 48h_Ctrl-48h_Ctrl_up.
 # Is there a change in CUT&Tag level for these motifs in 48h_Ctrl-48h_Ctrl?
 # In other words, does the opening of a motif target regions coincide with loss of H3K9me3?
-question_3 <- function(tf_enr, tf_scan, dec_cut) {
+question_3 <- function(dec_atac, tf_enr, tf_scan, dec_cut) {
   scn <- tf_scan |> 
     filter(motif_fdr < 0.01) |> 
     distinct(motif_id, peak_id) |> 
     separate_wider_delim(peak_id, delim = ":", names = c("chr", "startend"), cols_remove = FALSE)  |> 
     separate_wider_delim(startend, delim = "-", names = c("start", "end"), cols_remove = TRUE) |> 
     mutate(start = as.integer(start), end = as.integer(end)) 
+  atac_sig <- dec_atac |> 
+    filter(contrast_direction == "48h_Ctrl-iPS_Ctrl_up" & sig) |> 
+    distinct(peak_id)
   enr <- tf_enr |>
     filter(contrast_direction == "48h_Ctrl-iPS_Ctrl_up") |> 
     select(motif_id, motif_name, motif_consensus, target_enrichment) |> 
     inner_join(scn, by = join_by(motif_id)) |> 
     group_by(motif_consensus, chr, start, end, peak_id) |> 
-    summarise(motif_name = str_c(sort(motif_name), collapse = ";"), target_enrichment = mean(target_enrichment), .groups = "drop")
+    summarise(motif_name = str_c(sort(motif_name), collapse = ";"), target_enrichment = mean(target_enrichment), .groups = "drop") |> 
+    filter(peak_id %in% atac_sig$peak_id)
   d_cut <- dec_cut |> 
     filter(contrast == "48h_Ctrl-iPS_Ctrl")
   ov <- get_peak_overlaps(enr, d_cut) |> 
      select(motif_name, motif_consensus, target_enrichment, peak_id_atac, peak_id_cut, log_fc_cut = log_fc, p_value_cut = p_value, fdr_cut = fdr, sig_cut = sig) |> 
      arrange(fdr_cut)
+}
+
+# Monte-Carlo to assess logFC distribution of CUT&Tag for motifs that are enriched in 48h_Ctrl-48h_Ctrl_up.
+mc_ov_cut <- function(dec_cut, ov) {
+  bg <- dec_cut |>
+    filter(contrast == "48h_Ctrl-iPS_Ctrl") |>
+    pull(log_fc)
+
+  obs <- ov |>
+    group_by(motif_name) |>
+    summarise(
+      n = n(),
+      obs_mean = mean(log_fc_cut),
+      .groups = "drop"
+    )
+
+  set.seed(42)
+
+  boot_means <- function(n, B = 10000) {
+    replicate(B, mean(sample(bg, size = n, replace = FALSE)))
+  }
+
+  res <- obs |>
+    mutate(
+      null = map(n, boot_means),
+      null_mean = map_dbl(null, mean),
+      p_greater = map2_dbl(null, obs_mean, \(x, m) mean(x >= m)),
+      p_less = map2_dbl(null, obs_mean, \(x, m) mean(x <= m)),
+      p_two_sided = pmin(1, 2 * pmin(p_greater, p_less))
+    ) |>
+    mutate(fdr = p.adjust(p_two_sided, method = "BH"))
 }
 
 plot_question_3 <- function(ov, dec_cut) {
