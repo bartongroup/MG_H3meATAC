@@ -697,3 +697,21 @@ de_matsuda <- function(matsuda, dnr) {
   limma::topTable(fit2, coef = "PS_PSM_vs_iPS", number = Inf) |> 
     as_tibble(rownames = "gene_id")
 }
+
+
+save_matsuda <- function(matsuda) {
+  i2g <- matsuda |> distinct(gene_id, gene)
+
+  matsuda |> 
+    de_matsuda("201B7") |>
+    left_join(i2g, by = join_by(gene_id)) |>
+    relocate(gene, .after = gene_id) |> 
+    write_csv("tab/matsuda_de_201B7.csv")
+
+  matsuda |> 
+    de_matsuda("1231A3") |>
+    left_join(i2g, by = join_by(gene_id)) |>
+    relocate(gene, .after = gene_id) |> 
+    write_csv("tab/matsuda_de_1231A3.csv")
+
+}

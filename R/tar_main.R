@@ -269,9 +269,9 @@ targets_main <- function() {
     mn_ctr_dir = c("48h_Ctrl-iPS_Ctrl_up", "48h_Ctrl-iPS_Ctrl_down"),
 
     pdf_test_chipseeker_annotations_full = mn_plot_annot_group_test(test_dec_chipseeker_groups_libs_narrow, max_or = 1.9) |>
-      gp("atac_chipseeker_test_full", width = 4.2, height = 4),
+      gp("atac_chipseeker_test_full", width = 3.8, height = 4),
     pdf_test_rmsk_annotations_full = mn_plot_annot_group_test(test_dec_rmsk_groups_libs_narrow, max_or = 2) |>
-      gp("atac_rmsk_test_full", width = 4.2, height = 4),
+      gp("atac_rmsk_test_full", width = 3.6, height = 4),
     pdf_test_chipseeker_annotations = mn_plot_annot_group_test(test_dec_chipseeker_groups_libs_narrow |> filter(grp %in% mn_ctr_dir), max_or = 1.3) |>
       gp("atac_chipseeker_test", width = 2.8, height = 4),
     pdf_test_rmsk_annotations = mn_plot_annot_group_test(test_dec_rmsk_groups_libs_narrow |> filter(grp %in% mn_ctr_dir), max_or = 1.3) |>
@@ -291,6 +291,8 @@ targets_main <- function() {
       readr::write_csv("fig/atac_enr_closing_opening.csv"),
 
     matsuda = read_matsuda_data(),
+    sav_matsuda_de = save_matsuda(matsuda),
+    sav_dec_atac = dec_annotatr_groups_libs_narrow |> dplyr::filter(fdr < 0.01 & abs(log_fc) > 1 & contrast == "48h_Ctrl-iPS_Ctrl" & annotation %in% c("Promoter", "1-5 kb")) |> readr::write_csv("tab/dec_atac.csv"),
     sav_matsuda_atac_1 = merge_matsuda(matsuda, dec_annotatr_groups_libs_narrow, "201B7") |> readr::write_csv("tab/matsuda_201B7.csv"),
     sav_matsuda_atac_2 = merge_matsuda(matsuda, dec_annotatr_groups_libs_narrow, "1231A3") |> readr::write_csv("tab/matsuda_1231A3.csv"),
     pdf_matsuda_atac_1 = mn_plot_matsuda_comparison(matsuda, dec_annotatr_groups_libs_narrow, "201B7") |> gp("matsuda_atac_201B7.pdf", 5, 4),
