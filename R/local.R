@@ -337,7 +337,9 @@ annot_group_test <- function(dc) {
     ) |>
     mutate(
       fdr = p.adjust(p_value, method = "BH"),
-      log_odds_ratio = if_else(odds_ratio == 0, 0, log2(odds_ratio))
+      log_odds_ratio = if_else(odds_ratio == 0, 0, log2(odds_ratio)),
+      p_in = n_ann_grp / (n_ann_grp + n_notann_grp),
+      p_out = n_ann_notgrp / (n_ann_notgrp + n_notann_notgrp)
     )
 }
 

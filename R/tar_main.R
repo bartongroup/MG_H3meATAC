@@ -276,6 +276,8 @@ targets_main <- function() {
       gp("atac_chipseeker_test", width = 2.8, height = 4),
     pdf_test_rmsk_annotations = mn_plot_annot_group_test(test_dec_rmsk_groups_libs_narrow |> filter(grp %in% mn_ctr_dir), max_or = 1.3) |>
       gp("atac_rmsk_test", width = 2.8, height = 4),
+    sav_test_chipseeker = test_dec_chipseeker_groups_libs_narrow |> readr::write_csv("tab/test_chipseeker.csv"),
+    sav_test_rmsk = test_dec_rmsk_groups_libs_narrow |> readr::write_csv("tab/test_rmsk.csv"),
 
     pdf_enr_contrasts_logp_down = mn_plot_enr_contrasts_logp(tf_enr, ctr1 = "48h_Ctrl-iPS_Ctrl_down", ctr2 = "48h_SETDB1-iPS_SETDB1_down") |> 
       gp("atac_enr_contrasts_logp_down", width = 4, height = 4),
