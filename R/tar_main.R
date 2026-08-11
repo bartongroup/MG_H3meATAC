@@ -258,18 +258,41 @@ targets_main <- function() {
 
   for_manuscript <- tar_plan(
     mn_fdr_limit = 0.01,
-    mn_logfc_limit = 0.58,
-    mn_ctr = c("48h_Ctrl-iPS_Ctrl", "48h_SETDB1-48h_Ctrl", "iPS_SETDB1-iPS_Ctrl"),
+    mn_logfc_limit = 1,
 
-    png_volcano = mn_plot_volcano(dec_chipseeker_groups_libs_narrow |> filter(contrast %in% mn_ctr), fdr_limit = mn_fdr_limit, logfc_limit = mn_logfc_limit) |> gp("volcano", width = 7, height = 3),
+    mn_ctr = c("48h_Ctrl-iPS_Ctrl", "48h_SETDB1-48h_Ctrl"),
+    pdf_volcano_1 = mn_plot_volcano(dec_chipseeker_groups_libs_narrow |> filter(contrast == mn_ctr[1]), fdr_limit = mn_fdr_limit, logfc_limit = mn_logfc_limit) |>
+      gp(paste0("atac_volcano_", mn_ctr[1]), width = 4, height = 4),
+    pdf_volcano_2 = mn_plot_volcano(dec_chipseeker_groups_libs_narrow |> filter(contrast == mn_ctr[2]), fdr_limit = mn_fdr_limit, logfc_limit = mn_logfc_limit) |>
+      gp(paste0("atac_volcano_", mn_ctr[2]), width = 4, height = 4),
 
-    png_groups_chipseeker = plot_group_peak_annotations(peaks_chipseeker_narrow, rand_an = prand_chipseeker_narrow) |> 
-      gp("chipseeker_annotations", width = 4, height = 4),
-    png_chipseeker_annotations = mn_plot_group_peak_annotations(dec_chipseeker_sig_groups_libs_narrow, group_var = "contrast_direction", n_top = NULL) |>
-      gp("chipseeker_da", width = 4, height = 4),
-    png_chipseeker_rmsk = plot_group_peak_annotations(dec_rmsk_sig_groups_libs_narrow, group_var = "contrast_direction", annot_var = "rep_category", n_top = NULL, palette = 3) |>
-      gp("rmsk_da", width = 4, height = 4)
-    
+    mn_ctr_dir = c("48h_Ctrl-iPS_Ctrl_up", "48h_Ctrl-iPS_Ctrl_down"),
+
+    pdf_test_chipseeker_annotations_full = mn_plot_annot_group_test(test_dec_chipseeker_groups_libs_narrow, max_or = 1.9) |>
+      gp("atac_chipseeker_test_full", width = 4.2, height = 4),
+    pdf_test_rmsk_annotations_full = mn_plot_annot_group_test(test_dec_rmsk_groups_libs_narrow, max_or = 2) |>
+      gp("atac_rmsk_test_full", width = 4.2, height = 4),
+    pdf_test_chipseeker_annotations = mn_plot_annot_group_test(test_dec_chipseeker_groups_libs_narrow |> filter(grp %in% mn_ctr_dir), max_or = 1.3) |>
+      gp("atac_chipseeker_test", width = 2.8, height = 4),
+    pdf_test_rmsk_annotations = mn_plot_annot_group_test(test_dec_rmsk_groups_libs_narrow |> filter(grp %in% mn_ctr_dir), max_or = 1.3) |>
+      gp("atac_rmsk_test", width = 2.8, height = 4),
+
+    pdf_enr_contrasts_logp_down = mn_plot_enr_contrasts_logp(tf_enr, ctr1 = "48h_Ctrl-iPS_Ctrl_down", ctr2 = "48h_SETDB1-iPS_SETDB1_down") |> 
+      gp("atac_enr_contrasts_logp_down", width = 4, height = 4),
+    pdf_enr_contrasts_logp_up = mn_plot_enr_contrasts_logp(tf_enr, ctr1 = "48h_Ctrl-iPS_Ctrl_up", ctr2 = "48h_SETDB1-iPS_SETDB1_up") |> 
+      gp("atac_enr_contrasts_logp_up", width = 4, height = 4),
+    pdf_closing_opening = mn_plot_enr_contrasts_logp(tf_enr, ctr1 = "48h_Ctrl-iPS_Ctrl_down", ctr2 = "48h_Ctrl-iPS_Ctrl_up") |> 
+      gp("atac_enr_closing_opening", width = 4, height = 4),
+    sav_closing_opening = mn_get_enr_contrasts_logp(tf_enr, ctr1 = "48h_Ctrl-iPS_Ctrl_down", ctr2 = "48h_Ctrl-iPS_Ctrl_up") |> 
+      dplyr::mutate(dplyr::across(dplyr::where(is.numeric), ~signif(.x, 4))) |> 
+      dplyr::select(-mrg) |> 
+      readr::write_csv("fig/atac_enr_closing_opening.csv"),
+
+    matsuda = read_matsuda_data(),
+    sav_matsuda_atac_1 = merge_matsuda(matsuda, dec_annotatr_groups_libs_narrow, "201B7") |> readr::write_csv("tab/matsuda_201B7.csv"),
+    sav_matsuda_atac_2 = merge_matsuda(matsuda, dec_annotatr_groups_libs_narrow, "1231A3") |> readr::write_csv("tab/matsuda_1231A3.csv"),
+    pdf_matsuda_atac_1 = mn_plot_matsuda_comparison(matsuda, dec_annotatr_groups_libs_narrow, "201B7") |> gp("matsuda_atac_201B7.pdf", 5, 4),
+    pdf_matsuda_atac_2 = mn_plot_matsuda_comparison(matsuda, dec_annotatr_groups_libs_narrow, "1231A3") |> gp("matsuda_atac_1231A3.pdf", 5, 4)
   )
 
   for_shiny <- tar_plan(
@@ -297,7 +320,7 @@ targets_main <- function() {
     motif_analysis,
     cuttag_comparison,
     for_report,
-    #for_manuscript,
+    for_manuscript,
     for_shiny
   )
   

@@ -492,7 +492,7 @@ tar_read(fig_up_down_groups_libs_narrow)
 
 ```{r}
 #| label: fig-dec-chipseeker-groups-libs-narrow
-#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. **A** Proportion of annotations among all peaks. **B** Fisher's test results for each group. The colour shows the odds ratio, with red indicating an enrichment and blue indicating a depletion. The original odds ratio is always positive, here it is multiplied by -1 for depleted annotations. The asterisk indicates statistical significance. Background contains peaks with FDR > 0.01 and |logFC| <= 1."
+#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. **A** Proportion of annotations among all peaks. **B** Fisher's test results for each group. The colour shows the log2 odds ratio, with red indicating an enrichment and blue indicating a depletion. The asterisk indicates statistical significance. Background contains peaks with FDR > 0.01 and |logFC| <= 1."
 #| fig-width: 8
 #| fig-height: 4
 pl1 <- tar_read(fig_dec_chipseeker_groups_libs_narrow) 

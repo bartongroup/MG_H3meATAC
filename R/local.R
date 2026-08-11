@@ -317,7 +317,8 @@ annot_group_test <- function(dc) {
         fisher.test(x, alternative = "two.sided") |>
           broom::tidy() |>
           mutate(
-            estimate = if_else(depleted, -estimate, estimate),
+            #estimate = if_else(depleted, -estimate, estimate),
+            estimate = estimate,
             n_ann_grp = d$a,
             n_notann_grp = d$b,
             n_ann_notgrp = d$c,
@@ -334,7 +335,10 @@ annot_group_test <- function(dc) {
       ci_up = conf.high,
       p_value = p.value
     ) |>
-    mutate(fdr = p.adjust(p_value, method = "BH"))
+    mutate(
+      fdr = p.adjust(p_value, method = "BH"),
+      log_odds_ratio = if_else(odds_ratio == 0, 0, log2(odds_ratio))
+    )
 }
 
 
@@ -533,8 +537,8 @@ question_2 <- function(dec_rmsk_groups_libs_narrow, dec_cut) {
     arrange(fdr_cut)
 }
 
-# Look at motifs that are enriched in 48h_Ctrl-48h_Ctrl_up.
-# Is there a change in CUT&Tag level for these motifs in 48h_Ctrl-48h_Ctrl?
+# Look at motifs that are enriched in 48h_Ctrl-iPS_Ctrl_up.
+# Is there a change in CUT&Tag level for these motifs in 48h_Ctrl-iPS_Ctrl?
 # In other words, does the opening of a motif target regions coincide with loss of H3K9me3?
 question_3 <- function(dec_atac, tf_enr, tf_scan, dec_cut) {
   scn <- tf_scan |> 
@@ -560,7 +564,7 @@ question_3 <- function(dec_atac, tf_enr, tf_scan, dec_cut) {
      arrange(fdr_cut)
 }
 
-# Monte-Carlo to assess logFC distribution of CUT&Tag for motifs that are enriched in 48h_Ctrl-48h_Ctrl_up.
+# Monte-Carlo to assess logFC distribution of CUT&Tag for motifs that are enriched in 48h_Ctrl-iPS_Ctrl_up.
 mc_ov_cut <- function(dec_cut, ov) {
   bg <- dec_cut |>
     filter(contrast == "48h_Ctrl-iPS_Ctrl") |>
@@ -616,4 +620,78 @@ question_4 <- function(dec_chipseeker_groups_libs_narrow) {
     filter(fdr < 0.01 & abs(log_fc) > 1 & annotation == "Promoter") |>
     distinct(contrast, log_fc, gene_symbol, gene_name, gene_biotype) |> 
     arrange(contrast, log_fc)
+}
+
+# RNA-seq data from https://www.nature.com/articles/s41586-020-2144-9
+read_matsuda_data <- function() {
+  path <- "info/41586_2020_2144_MOESM3_ESM.xlsx"
+  stopifnot(file.exists(path))
+
+  fill_right <- function(x) {
+    for (i in seq_along(x)[-1]) {
+      if (is.na(x[i])) x[i] <- x[i - 1]
+    }
+    x
+  }
+
+  simplify_condition <- function(x) {
+    sub("^D[0-9]+_([^_]+)_([^＿]+)＿FPKM$", "\\1_\\2", x)
+  }
+
+  hdr <- read_excel(path, sheet = "FPKM", col_names = FALSE, n_max = 2, .name_repair = "minimal")
+  condition <- as.character(hdr[1, ])
+  replicate  <- as.character(hdr[2, ])
+
+  condition <- fill_right(condition)
+  simple_condition <- simplify_condition(condition)
+
+  col_names <- c(
+    condition[1:3],
+    paste(simple_condition[-(1:3)], replicate[-(1:3)], sep = "_")
+  )
+
+  readxl::read_excel(
+    path,
+    sheet = "FPKM",
+    skip = 2,
+    col_names = col_names,
+    .name_repair = "minimal"
+  ) |> 
+    rename(group = Group) |> 
+    mutate(across(-c(gene_id, gene, group), as.numeric)) |> 
+    pivot_longer(-c(gene_id, gene, group)) |> 
+    separate_wider_delim(name, names = c("condition", "donor", "replicate"), delim = "_")
+}
+
+
+de_matsuda <- function(matsuda, dnr) {
+  d <- matsuda |>
+    filter(condition %in% c("iPS", "PS", "PSM") & donor == dnr) |> 
+    unite(sample, c(condition, replicate), remove = FALSE)
+  meta <- d |> 
+    distinct(sample, condition, replicate) |> 
+    mutate(condition = as_factor(condition))
+
+  tab <- d |> 
+    mutate(value = log2(value + 1)) |> 
+    pivot_wider(id_cols = gene_id, names_from = sample, values_from = value) |> 
+    column_to_rownames("gene_id") |> 
+    as.matrix()
+  tab <- tab[, meta$sample]
+
+  design <- model.matrix(~ 0 + condition, data = meta)
+  colnames(design) <- levels(meta$condition)
+
+  fit <- limma::lmFit(tab, design)
+
+  contrast <- limma::makeContrasts(
+    PS_PSM_vs_iPS = (PS + PSM) / 2 - iPS,
+    levels = design
+  )
+
+  fit2 <- limma::contrasts.fit(fit, contrast)
+  fit2 <- limma::eBayes(fit2)
+
+  limma::topTable(fit2, coef = "PS_PSM_vs_iPS", number = Inf) |> 
+    as_tibble(rownames = "gene_id")
 }

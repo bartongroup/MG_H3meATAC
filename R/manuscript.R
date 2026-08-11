@@ -136,3 +136,87 @@ mn_plot_volcano <- function(res, fdr_limit = 0.01, logfc_limit = 0, point_size =
 
   g
 }
+
+
+
+mn_plot_annot_group_test <- function(tst, fdr_limit = 0.01, max_or = NULL) {
+  sig_tst <- tst |> filter(fdr < fdr_limit)
+  mx <- max(abs(tst$log_odds_ratio))
+  if(!is.null(max_or)){
+    mx <- max_or
+    tst <- tst |> 
+      mutate(log_odds_ratio = if_else(abs(log_odds_ratio) > mx, sign(log_odds_ratio) * mx, log_odds_ratio))
+  } 
+  tst |> 
+    ggplot(aes(x = grp, y = ann, fill = log_odds_ratio)) +
+    th() +
+    theme(
+      axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+    ) +
+    geom_tile() +
+    geom_point(data = sig_tst, shape = 8, size = 2, stroke = 0.4) + 
+    scale_fill_distiller(type = "div", palette = "RdBu", limits = c(-mx, mx)) +
+    labs(x = NULL, y = NULL, fill = expression(log[2]~OR))
+}
+
+
+mn_get_enr_contrasts_logp <-  function(tf_enr, ctr1, ctr2) {
+  d <- tf_enr |> 
+    mutate(lp = -log10(pval)) |>
+    filter(contrast_direction %in% c(ctr1, ctr2)) 
+  
+  d |> 
+    pivot_wider(id_cols = c(motif_name, motif_consensus), names_from = contrast_direction, values_from = lp) |> 
+    rename(x = !!sym(ctr1), y = !!sym(ctr2)) |> 
+    mutate(
+      mrg = is.na(x) | is.na(y),
+      across(x:y, ~replace_na(.x, 0))
+    ) |> 
+    distinct(x, y, motif_name, mrg)
+}
+
+mn_plot_enr_contrasts_logp <- function(tf_enr, ctr1, ctr2) {
+  mn_get_enr_contrasts_logp(tf_enr, ctr1, ctr2) |>
+    ggplot(aes(x = x, y = y, shape = mrg)) +
+    th() +
+    theme(legend.position = "none") +
+    geom_point() +
+    ggrepel::geom_text_repel(aes(label = motif_name), size = 2) +
+    scale_shape_manual(values = c(16, 1)) +
+    labs(x = bquote(-log[10] ~ P ~ (.(ctr1))), y = bquote(-log[10] ~ P ~ (.(ctr2))))
+}
+
+
+merge_matsuda <- function(matsuda, dec_atac, dnr = "201B7") {
+  dem <- de_matsuda(matsuda, dnr)
+  m <- matsuda |> 
+    filter(donor == dnr & condition %in% c("iPS", "PS", "PSM") & value > 0) |> 
+    group_by(gene_id, gene, group, condition) |> 
+    summarise(v = mean(value), .groups = "drop") |> 
+    pivot_wider(id_cols = c(gene_id, gene, group), names_from = condition, values_from = v) |> 
+    mutate(smat_logfc = log2(0.5 * (PS + PSM) / iPS)) |>
+    rename(gene_symbol = gene) |> 
+    left_join(dem, by = join_by(gene_id)) |> 
+    rename(mat_logfc = logFC) |> 
+    filter(adj.P.Val < 0.01 & abs(mat_logfc) > 1)
+  d <- dec_atac |> 
+    filter(fdr < 0.01 & abs(log_fc) > 1 & contrast == "48h_Ctrl-iPS_Ctrl" & annotation %in% c("Promoter", "1-5 kb")) |>
+    select(gene_symbol, atac_logfc = log_fc)
+
+  inner_join(m, d, by = join_by(gene_symbol)) |> 
+    select(gene_id, gene_symbol, group, PS, PSM, iPS, mat_logfc, p_value = P.Value, fdr = adj.P.Val, atac_logfc)
+}
+
+mn_plot_matsuda_comparison <- function(matsuda, dec_atac, dnr = "201B7") {
+ 
+  df <- merge_matsuda(matsuda, dec_atac, dnr = "201B7")
+
+  df |> 
+    ggplot(aes(x = mat_logfc, y = atac_logfc, colour = -log10(fdr))) +
+    th() +
+    geom_point() +
+    geom_vline(xintercept = 0, colour = "grey80") +
+    geom_hline(yintercept = 0, colour = "grey80") +
+    scale_colour_distiller(palette = "Reds", direction = 1) +
+    labs(x = expression(log[2]~(0.5*(PS + PSM) / iPS)), y = expression(log[2]~FC~"ATAC-seq"), colour = expression(-log[10]~FDR))
+}
