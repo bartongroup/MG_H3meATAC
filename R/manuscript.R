@@ -187,7 +187,7 @@ mn_plot_enr_contrasts_logp <- function(tf_enr, ctr1, ctr2) {
 }
 
 
-merge_matsuda <- function(matsuda, dec_atac, dnr = "201B7") {
+merge_matsuda <- function(matsuda, dec_atac, dnr) {
   dem <- de_matsuda(matsuda, dnr)
   m <- matsuda |> 
     filter(donor == dnr & condition %in% c("iPS", "PS", "PSM") & value > 0) |> 
@@ -202,14 +202,18 @@ merge_matsuda <- function(matsuda, dec_atac, dnr = "201B7") {
   d <- dec_atac |> 
     filter(fdr < 0.01 & abs(log_fc) > 1 & contrast == "48h_Ctrl-iPS_Ctrl" & annotation %in% c("Promoter", "1-5 kb")) |>
     select(gene_symbol, atac_logfc = log_fc)
+  # Decided not to average
+    #drop_na() |> 
+    #group_by(gene_symbol) |> 
+    #summarise(atac_logfc = mean(atac_logfc))
 
   inner_join(m, d, by = join_by(gene_symbol)) |> 
     select(gene_id, gene_symbol, group, PS, PSM, iPS, mat_logfc, p_value = P.Value, fdr = adj.P.Val, atac_logfc)
 }
 
-mn_plot_matsuda_comparison <- function(matsuda, dec_atac, dnr = "201B7") {
+mn_plot_matsuda_comparison <- function(matsuda, dec_atac, dnr) {
  
-  df <- merge_matsuda(matsuda, dec_atac, dnr = "201B7")
+  df <- merge_matsuda(matsuda, dec_atac, dnr)
 
   df |> 
     ggplot(aes(x = mat_logfc, y = atac_logfc, colour = -log10(fdr))) +

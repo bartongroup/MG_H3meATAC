@@ -295,8 +295,8 @@ targets_main <- function() {
     sav_dec_atac = dec_annotatr_groups_libs_narrow |> dplyr::filter(fdr < 0.01 & abs(log_fc) > 1 & contrast == "48h_Ctrl-iPS_Ctrl" & annotation %in% c("Promoter", "1-5 kb")) |> readr::write_csv("tab/dec_atac.csv"),
     sav_matsuda_atac_1 = merge_matsuda(matsuda, dec_annotatr_groups_libs_narrow, "201B7") |> readr::write_csv("tab/matsuda_201B7.csv"),
     sav_matsuda_atac_2 = merge_matsuda(matsuda, dec_annotatr_groups_libs_narrow, "1231A3") |> readr::write_csv("tab/matsuda_1231A3.csv"),
-    pdf_matsuda_atac_1 = mn_plot_matsuda_comparison(matsuda, dec_annotatr_groups_libs_narrow, "201B7") |> gp("matsuda_atac_201B7.pdf", 5, 4),
-    pdf_matsuda_atac_2 = mn_plot_matsuda_comparison(matsuda, dec_annotatr_groups_libs_narrow, "1231A3") |> gp("matsuda_atac_1231A3.pdf", 5, 4)
+    pdf_matsuda_atac_1 = mn_plot_matsuda_comparison(matsuda, dec_annotatr_groups_libs_narrow, "201B7") |> gp("matsuda_atac_201B7", 5, 4),
+    pdf_matsuda_atac_2 = mn_plot_matsuda_comparison(matsuda, dec_annotatr_groups_libs_narrow, "1231A3") |> gp("matsuda_atac_1231A3", 5, 4)
   )
 
   for_shiny <- tar_plan(
