@@ -140,6 +140,12 @@ mn_plot_volcano <- function(res, fdr_limit = 0.01, logfc_limit = 0, point_size =
 
 
 mn_plot_annot_group_test <- function(tst, fdr_limit = 0.01, log_or_limit = 0.5, max_or = NULL) {
+  if("SINE" %in% tst$ann) {
+    tst <- tst |>
+      mutate(ann = factor(ann, levels = c("SINE", "LINE", "LTR", "Simple_repeat", "DNA", "Low_complexity", "Satellite", "Retroposon", 
+"Other")) |> fct_rev())
+  }
+  
   sig_tst <- tst |> filter(fdr < fdr_limit & abs(log_odds_ratio) > log_or_limit)
   mx <- max(abs(tst$log_odds_ratio))
   if(!is.null(max_or)){
