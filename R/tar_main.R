@@ -208,6 +208,10 @@ targets_main <- function() {
     tf_enr = motif_enrichment(dec_for_motifs, consensus_seqs, genome_file, tf_motifs, min_target = 10),
     tf_comb = dplyr::left_join(tf_enr, dec_tf_scan,  by = dplyr::join_by(motif_name, motif_id, contrast_direction), relationship = "many-to-many"),
 
+    # Motif enrichment for selected contrasts, deeper
+    dec_for_motifs_1 = dec_chipseeker_sig_groups_libs_narrow |> dplyr::filter(abs(log_fc) > 1 & contrast_direction %in% c("48h_SETDB1-48h_Ctrl_up", "iPS_SETDB1-iPS_Ctrl_up")),
+    tf_enr_1 = motif_enrichment(dec_for_motifs_1, consensus_seqs, genome_file, tf_motifs, min_target = 10),
+
     fig_enr_contrasts_logp_down = plot_enr_contrasts_logp(tf_enr, ctr1 = "48h_Ctrl-iPS_Ctrl_down", ctr2 = "48h_SETDB1-iPS_SETDB1_down"),
     fig_enr_contrasts_logp_up = plot_enr_contrasts_logp(tf_enr, ctr1 = "48h_Ctrl-iPS_Ctrl_up", ctr2 = "48h_SETDB1-iPS_SETDB1_up")
   )
@@ -266,7 +270,10 @@ targets_main <- function() {
     png_peaks_narrow_11 = plot_peak_distribution_chrom(peaks_narrow, "11", metadata) |> gs("peaks_narrow_11", width = 8, height = 8),
 
     sav_bed_consensus = write_bed(consensus_peaks, "tab/consensus_peaks.bed"),
-    sav_bed_de = write_bed(dec_groups_libs_narrow, "tab/de_peaks.bed", extra_cols = c("contrast_direction", "log_fc"))
+    sav_bed_de = write_bed(dec_groups_libs_narrow, "tab/de_peaks.bed", extra_cols = c("contrast_direction", "log_fc")),
+
+    sav_over_cut_atac_ctrl = over_cut_atac_ctrl |> readr::write_csv("tab/compare_cut_atac_ctrl.csv"),
+    sav_over_cut_atac_set = over_cut_atac_set |> readr::write_csv("tab/compare_cut_atac_setdb1.csv")
   )
 
   for_manuscript <- tar_plan(

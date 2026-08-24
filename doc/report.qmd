@@ -692,6 +692,35 @@ pl2 <- tar_read(fig_enr_contrasts_logp_down)
 plot_grid(pl1, pl2, ncol = 1) 
 ```
 
+## Selected contrasts
+
+Here we look at motif enrichment in contrasts `48h_SETDB1-48h_Ctrl_up` and `iPS_SETDB1-iPS_Ctrl_up` only, but with a deeper selection of $|\log_2 FC| > 1$.
+
+```{r}
+#| label: tbl-motif-enrichment-sel
+#| tbl-cap: Motif enrichment results for DB peaks with $FDR < 0.01$ and $|\log_2 FC| > 1$, in contrasts `48h_SETDB1-48h_Ctrl_up` and `iPS_SETDB1-iPS_Ctrl_up` only. Only motifs with q-value < 0.01 are shown. `Np` indicates the number of peaks with the motif detected, in targets and background.
+tar_read(tf_enr_1) |> 
+  group_by(contrast_direction) |> 
+  arrange(desc(target_enrichment)) |> 
+  select(Motif = motif_name, Consensus = motif_consensus, `Np target` = target_seq_hits, `Np background` = bkg_seq_hits, `Enrichment` = target_enrichment) |> 
+  gt() |> 
+  fmt_number(columns = Enrichment, n_sigfig = 3)
+```
+
+
+```{r}
+#| label: tbl-motif-summary-sel
+#| tbl-cap: Summary of motif sequences from @tbl-motif-enrichment arrange for easy comparison between contrasts, in contrasts `48h_SETDB1-48h_Ctrl_up` and `iPS_SETDB1-iPS_Ctrl_up` only
+tar_read(tf_enr_1) |>
+  group_by(motif_name, contrast_direction) |>
+  summarise(cons = str_c(motif_consensus, collapse = ",")) |>
+  ungroup() |> 
+  pivot_wider(id_cols = motif_name, names_from = contrast_direction, values_from = cons, values_fill = "-") |> 
+  rename(Motif = motif_name) |> 
+  gt()
+```
+
+
 # Comparison to CUT&Tag experiment
 
 ```{r}
@@ -824,6 +853,33 @@ plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
 
 ## Downloads {#sec-downloads}
 
+```{r}
+#| label: tbl-downloads
+#| tbl-cap: Annotated differential abundance results
+expand_grid(
+  norm = c("libs"),
+  type = c("narrow"),
+  model = c("groups")
+) |> 
+  unite(name, c(model, norm, type), remove = FALSE) |>
+  mutate(link = str_glue("[link](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3meatac/tab/diffbind_chipseeker_{name}.csv)")) |> 
+  select(-name) |> 
+  mutate(
+    Normalisation = recode_values(norm, "libs" ~ "Library size", "spike" ~ "Spike-in"),
+    `Peak type` = recode_values(type, "broad" ~ "Broad", "narrow" ~ "Narrow"),
+    `DE model` = recode_values(model, "full" ~ "Two factors", "groups" ~ "Separate contrasts")
+  ) |> 
+  select(-c(norm, type, model)) |> 
+  relocate(link, .after = 4) |> 
+  gt() |> 
+  fmt_markdown(columns = link)
+```
+
+ - [Repeat Masker - consensus peaks mapping](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3meatac/tab/rmask_peaks.csv)
+
+
+ - [ATAC-seq/CUT&Tag comparison (48h vs iPS Ctrl)](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3meatac/tab/compare_cut_atac_ctrl.csv)
+ - [ATAC-seq/CUT&Tag comparison (48h vs iPS SETDB1)](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3meatac/tab/compare_cut_atac_setdb1.csv)
  
 ## Code
 
