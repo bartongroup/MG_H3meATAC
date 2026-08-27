@@ -460,7 +460,7 @@ tar_read(fig_up_down_full_libs_narrow)
 #| fig-width: 8
 #| fig-height: 4
 pl1 <- tar_read(fig_dec_chipseeker_full_libs_narrow) 
-pl2 <- tar_read(fig_test_dec_chipseeker_full_libs_narrow)
+pl2 <- tar_read(fig_test_de_chipseeker_full_libs_narrow)
 plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
 ```
 
@@ -496,7 +496,7 @@ tar_read(fig_up_down_groups_libs_narrow)
 #| fig-width: 8
 #| fig-height: 4
 pl1 <- tar_read(fig_dec_chipseeker_groups_libs_narrow) 
-pl2 <- tar_read(fig_test_dec_chipseeker_groups_libs_narrow)
+pl2 <- tar_read(fig_test_de_chipseeker_groups_libs_narrow)
 plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
 ```
 
@@ -573,7 +573,7 @@ tar_read(fig_groups_rmsk_narrow)
 #| fig-width: 7
 #| fig-height: 4
 pl1 <- tar_read(fig_dec_rmsk_groups_libs_narrow)
-pl2 <- tar_read(fig_test_dec_rmsk_groups_libs_narrow) 
+pl2 <- tar_read(fig_test_de_rmsk_groups_libs_narrow)
 plot_grid(pl1, pl2, nrow = 1)
 ```
 

@@ -171,9 +171,9 @@ targets_main <- function() {
         test_de_chipseeker = annot_de_test(dec_chipseeker_all, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit, annot_var = "annotation"),
         test_de_annotatr = annot_de_test(dec_annotatr_all, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit, annot_var = "annotation"),
         test_de_rmsk = annot_de_test(dec_rmsk_all, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit, annot_var = "rep_category"),
-        fig_test_de_chipseeker = plot_annot_group_test(test_de_chipseeker),
-        fig_test_de_annotatr = plot_annot_group_test(test_de_annotatr),
-        fig_test_de_rmsk = plot_annot_group_test(test_de_rmsk),
+        fig_test_de_chipseeker = mn_plot_annot_group_test(test_de_chipseeker),
+        fig_test_de_annotatr = mn_plot_annot_group_test(test_de_annotatr),
+        fig_test_de_rmsk = mn_plot_annot_group_test(test_de_rmsk, max_or = 2.9),
 
         sav_dec = write_dec(dec_chipseeker, paste0("diffbind_chipseeker_", MODEL, "_", NAME)),
 
