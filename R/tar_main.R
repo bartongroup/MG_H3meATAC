@@ -143,6 +143,7 @@ targets_main <- function() {
         dec_annotatr_all = add_unannotated_peaks(dec, dec_annotatr, annot_var = "annotation"),
         dec_chipseeker_all = add_unannotated_peaks(dec, dec_chipseeker, annot_var = "annotation"),
         dec_rmsk_all = add_unannotated_peaks(dec, dec_rmsk, annot_var = "rep_category"),
+        dec_rmsk_all_ltr = add_unannotated_peaks(dec, dec_rmsk |> dplyr::filter(rep_category == "LTR"), annot_var = "rep_family"),
 
         dec_annotatr_sig = dec_annotatr |> dplyr::filter(fdr < params$fdr_limit & abs(log_fc) > params$logfc_limit),
         dec_annotatr_nsig = dec_annotatr |> dplyr::filter(fdr >= params$fdr_limit & abs(log_fc) <= params$logfc_limit),
@@ -171,9 +172,11 @@ targets_main <- function() {
         test_de_chipseeker = annot_de_test(dec_chipseeker_all, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit, annot_var = "annotation"),
         test_de_annotatr = annot_de_test(dec_annotatr_all, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit, annot_var = "annotation"),
         test_de_rmsk = annot_de_test(dec_rmsk_all, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit, annot_var = "rep_category"),
+        test_de_rmsk_ltr = annot_de_test(dec_rmsk_all_ltr, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit, annot_var = "rep_family"),
         fig_test_de_chipseeker = mn_plot_annot_group_test(test_de_chipseeker),
         fig_test_de_annotatr = mn_plot_annot_group_test(test_de_annotatr),
         fig_test_de_rmsk = mn_plot_annot_group_test(test_de_rmsk, max_or = 2.9),
+        fig_test_de_rmsk_ltr = mn_plot_annot_group_test(test_de_rmsk_ltr, max_or = 4.2),
 
         sav_dec = write_dec(dec_chipseeker, paste0("diffbind_chipseeker_", MODEL, "_", NAME)),
 
@@ -294,6 +297,10 @@ targets_main <- function() {
       gp("atac_chipseeker_test_full", width = 3.4, height = 4),
     pdf_test_rmsk_annotations_full = mn_plot_annot_group_test(test_de_rmsk_groups_libs_narrow, max_or = 2.9) |>
       gp("atac_rmsk_test_full", width = 3.3, height = 4),
+
+    pdf_test_rmsk_annotations_ltr = mn_plot_annot_group_test(test_de_rmsk_ltr_groups_libs_narrow, max_or = 4.2) |>
+      gp("atac_rmsk_test_ltr", width = 3.3, height = 4),
+
     #pdf_test_chipseeker_annotations = mn_plot_annot_group_test(test_dec_chipseeker_groups_libs_narrow |> filter(grp %in% mn_ctr_dir), max_or = 1.3) |>
     # gp("atac_chipseeker_test", width = 2.8, height = 4),
     #pdf_test_rmsk_annotations = mn_plot_annot_group_test(test_dec_rmsk_groups_libs_narrow |> filter(grp %in% mn_ctr_dir), max_or = 1.3) |>
