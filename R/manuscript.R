@@ -93,7 +93,7 @@ mn_plot_group_peak_annotations <- function(an, group_var = "group", annot_var = 
 
 
 mn_plot_volcano <- function(res, fdr_limit = 0.01, logfc_limit = 0, point_size = 0.5,
-                            point_alpha = 0.5, scales = "fixed") {
+                            point_alpha = 0.5, scales = "fixed", ncol = NULL) {
   
   r <- res |>
     mutate(
@@ -118,7 +118,7 @@ mn_plot_volcano <- function(res, fdr_limit = 0.01, logfc_limit = 0, point_size =
     ) +
     geom_point(data = r_nsel, aes(x = x, y = y), colour = "grey70",
               size = point_size, alpha = point_alpha) +
-    facet_wrap( ~ group, scale = scales) +
+    facet_wrap( ~ group, scale = scales, ncol = ncol) +
     geom_vline(xintercept = 0, linewidth = 0.1, alpha = 0.5) +
     labs(x = expression(log[2]~FC), y = expression(-log[10]~P)) +
     scale_y_continuous(expand = expansion(mult = c(0, 0.03)), limits = c(0, NA))
