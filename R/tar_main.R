@@ -97,8 +97,8 @@ targets_main <- function() {
       # the cluster and cache the result. After creating
       # "diffbind_metadata_narrow.csv" copy it to the cluster and run the script
       # "diffbind_count_cluster.R". Copy *.rds files back here.
-      # db = read_and_count_diffbind(meta_db, min_overlap = 2),
-      # db_spike = spikein_normalization(dbc),
+      # If your machine has enough memory (>100 GB), uncomment the line below.
+      # db = read_and_count_diffbind(meta_db, min_overlap = 2)
     )
   )
 

@@ -14,7 +14,8 @@ cluster/*
 !cluster/Snakefile
 !cluster/run_snake.sh
 !cluster/config
-!cluster/env.txt
+!cluster/spec-file.txt
+!cluster/environment.txt
 !cluster/subtiwiki/
 !cluster/subtiwiki/make_ncrna_gtf.R
 shiny/data

@@ -125,12 +125,12 @@ mn_plot_volcano <- function(res, fdr_limit = 0.01, logfc_limit = 0, point_size =
 
 
     if (nrow(r_up) > 0) {
-      g <- g + geom_point(data = r_up, aes(x = x, y = y), colour = "#0072B2",
+      g <- g + geom_point(data = r_up, aes(x = x, y = y), colour = "black",
                           size = point_size, alpha = point_alpha)
     }
 
     if (nrow(r_down) > 0) {
-      g <- g + geom_point(data = r_down, aes(x = x, y = y), colour = "#D55E00",
+      g <- g + geom_point(data = r_down, aes(x = x, y = y), colour = "black",
                           size = point_size, alpha = point_alpha)
     }
 
