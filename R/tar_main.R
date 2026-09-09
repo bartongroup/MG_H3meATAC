@@ -309,6 +309,13 @@ targets_main <- function() {
     pdf_test_rmsk_annotations_ltr = mn_plot_annot_group_test(test_de_rmsk_ltr_groups_libs_narrow, max_or = 4.2) |>
       gp("atac_rmsk_test_ltr", width = 3.3, height = 4),
 
+    ctr_for_ltr = c("48h_Ctrl-iPS_Ctrl_down", "48h_SETDB1-48h_Ctrl_up", "48h_SETDB1-iPS_SETDB1_down", "48h_SETDB1-iPS_SETDB1_up", "iPS_SETDB1-iPS_Ctrl_up"),
+    pdf_rmsk_ltr = dec_rmsk_groups_libs_narrow |>
+      filter(contrast_direction %in% ctr_for_ltr & fdr < mn_fdr_limit, abs(log_fc) > mn_logfc_limit, rep_category == "LTR") |>
+      mutate(rep_family = str_remove(rep_family, "\\?"), contrast_direction = factor(contrast_direction, levels = ctr_for_ltr)) |> 
+      plot_group_peak_annotations(group_var = "contrast_direction", annot_var = "rep_family", n_top = Inf) |> 
+      gp("atac_rmsk_ltr", width = 3, height = 4),
+
     #pdf_test_chipseeker_annotations = mn_plot_annot_group_test(test_dec_chipseeker_groups_libs_narrow |> filter(grp %in% mn_ctr_dir), max_or = 1.3) |>
     # gp("atac_chipseeker_test", width = 2.8, height = 4),
     #pdf_test_rmsk_annotations = mn_plot_annot_group_test(test_dec_rmsk_groups_libs_narrow |> filter(grp %in% mn_ctr_dir), max_or = 1.3) |>

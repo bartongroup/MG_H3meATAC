@@ -140,13 +140,14 @@ mn_plot_volcano <- function(res, fdr_limit = 0.01, logfc_limit = 0, point_size =
 
 
 mn_plot_annot_group_test <- function(tst, fdr_limit = 0.01, log_or_limit = 0.5, max_or = NULL) {
-  if("SINE" %in% tst$ann) {
+    if("SINE" %in% tst$ann) {
     tst <- tst |>
       mutate(ann = factor(ann, levels = c("SINE", "LINE", "LTR", "Simple_repeat", "DNA", "Low_complexity", "Satellite", "Retroposon", 
 "Other")) |> fct_rev())
   }
-  
+
   sig_tst <- tst |> filter(fdr < fdr_limit & abs(log_odds_ratio) > log_or_limit)
+  inf_tst <- tst |> filter(is.infinite(log_odds_ratio))
   mx <- max(abs(tst$log_odds_ratio))
   if(!is.null(max_or)){
     mx <- max_or
@@ -161,6 +162,7 @@ mn_plot_annot_group_test <- function(tst, fdr_limit = 0.01, log_or_limit = 0.5, 
     ) +
     geom_tile() +
     geom_point(data = sig_tst, shape = 8, size = 2, stroke = 0.4) + 
+    geom_text(data = inf_tst, label = expression(infinity), size = 5, colour = "white", alpha = 0.5) +
     scale_fill_distiller(type = "div", palette = "RdBu", limits = c(-mx, mx)) +
     labs(x = NULL, y = NULL, fill = expression(log[2]~OR))
 }
